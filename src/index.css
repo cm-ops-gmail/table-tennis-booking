@@ -1,0 +1,261 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Design tokens mirrored from the 10 Minute School Design System
+ * (https://local-design-system.10minuteschool.net/design-tokens).
+ * Neutral shadcn/ui palette in oklch, --radius 0.625rem, Geist typography.
+ * --success / --warning are local additions for booking states, kept in the
+ * same oklch idiom as the system's chart tokens.
+ */
+:root {
+  --radius: 0.625rem;
+  --background: oklch(100% 0 0);
+  --secondary-background: oklch(98.4% 0 0);
+  --foreground: oklch(14.5% 0 0);
+  --main-gray: oklch(98.5% 0.001 247);
+  --card: oklch(100% 0 0);
+  --card-foreground: oklch(14.5% 0 0);
+  --popover: oklch(100% 0 0);
+  --popover-foreground: oklch(14.5% 0 0);
+  --primary: oklch(20.5% 0 0);
+  --primary-foreground: oklch(98.5% 0 0);
+  --secondary: oklch(97% 0 0);
+  --secondary-foreground: oklch(20.5% 0 0);
+  --muted: oklch(97% 0 0);
+  --muted-foreground: oklch(55.6% 0 0);
+  --accent: oklch(97% 0 0);
+  --accent-foreground: oklch(20.5% 0 0);
+  --destructive: oklch(57.7% 0.245 27.325);
+  --success: oklch(59.6% 0.145 163.2);
+  --warning: oklch(68.1% 0.162 75.83);
+  --info: oklch(55% 0.17 255);
+  --border: oklch(92.2% 0 0);
+  --input: oklch(92.2% 0 0);
+  --ring: oklch(70.8% 0 0);
+  --chart-1: oklch(64.6% 0.222 41.116);
+  --chart-2: oklch(60% 0.118 184.704);
+  --chart-3: oklch(39.8% 0.07 227.392);
+  --chart-4: oklch(82.8% 0.189 84.429);
+  --chart-5: oklch(76.9% 0.188 70.08);
+}
+
+.dark {
+  --background: oklch(14.5% 0 0);
+  --secondary-background: oklch(20.5% 0 0);
+  --foreground: oklch(98.5% 0 0);
+  --card: oklch(20.5% 0 0);
+  --card-foreground: oklch(98.5% 0 0);
+  --popover: oklch(20.5% 0 0);
+  --popover-foreground: oklch(98.5% 0 0);
+  --primary: oklch(92.2% 0 0);
+  --primary-foreground: oklch(20.5% 0 0);
+  --secondary: oklch(26.9% 0 0);
+  --secondary-foreground: oklch(98.5% 0 0);
+  --muted: oklch(26.9% 0 0);
+  --muted-foreground: oklch(70.8% 0 0);
+  --accent: oklch(26.9% 0 0);
+  --accent-foreground: oklch(98.5% 0 0);
+  --destructive: oklch(70.4% 0.191 22.216);
+  --success: oklch(69.6% 0.17 162.48);
+  --warning: oklch(82.8% 0.189 84.429);
+  --info: oklch(70% 0.15 255);
+  --border: oklch(100% 0 0 / 0.1);
+  --input: oklch(100% 0 0 / 0.15);
+  --ring: oklch(55.6% 0 0);
+  --main-gray: oklch(11% 0 0);
+}
+
+* {
+  border-color: var(--border);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--main-gray);
+  color: var(--foreground);
+  color-scheme: light dark;
+  font-family: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 9999px;
+}
+
+/* ------------------------------------------------------------------ *
+ * Motion — playful but on-brand. Everything degrades to no-motion.
+ * ------------------------------------------------------------------ */
+@keyframes tt-rise {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes tt-pop {
+  0%   { opacity: 0; transform: scale(0.6); }
+  60%  { opacity: 1; transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+@keyframes tt-float {
+  0%, 100% { transform: translateY(0) rotate(-6deg); }
+  50%      { transform: translateY(-14px) rotate(8deg); }
+}
+@keyframes tt-float-slow {
+  0%, 100% { transform: translateY(0) translateX(0); }
+  50%      { transform: translateY(-26px) translateX(10px); }
+}
+@keyframes tt-bounce-ball {
+  0%, 100% { transform: translateY(0) scaleY(1); }
+  10%      { transform: translateY(0) scaleY(0.82); }
+  45%      { transform: translateY(-140%) scaleY(1.06); }
+  80%      { transform: translateY(0) scaleY(0.9); }
+}
+@keyframes tt-spin-slow { to { transform: rotate(360deg); } }
+@keyframes tt-wiggle {
+  0%, 100% { transform: rotate(0); }
+  25%      { transform: rotate(-12deg); }
+  75%      { transform: rotate(12deg); }
+}
+@keyframes tt-shimmer {
+  100% { background-position: 200% 0; }
+}
+@keyframes tt-ring-pulse {
+  0%   { box-shadow: 0 0 0 0 color-mix(in oklch, var(--success) 55%, transparent); }
+  70%  { box-shadow: 0 0 0 10px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+@keyframes tt-gradient-pan {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+@keyframes tt-toast-in {
+  from { opacity: 0; transform: translateY(16px) scale(0.96); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes tt-confetti-fall {
+  to { transform: translate3d(var(--dx), 105vh, 0) rotate(var(--dr)); opacity: 0; }
+}
+@keyframes tt-overlay {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes tt-modal {
+  from { opacity: 0; transform: translateY(10px) scale(0.965); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes tt-textcycle {
+  0%, 26%   { opacity: 0; transform: translateY(8px); }
+  33%, 60%  { opacity: 1; transform: translateY(0); }
+  67%, 100% { opacity: 0; transform: translateY(-8px); }
+}
+@keyframes tt-sheen {
+  0%   { transform: translateX(-120%) skewX(-18deg); }
+  60%, 100% { transform: translateX(320%) skewX(-18deg); }
+}
+
+.tt-overlay-in { animation: tt-overlay 0.2s ease both; }
+.tt-modal-in { animation: tt-modal 0.3s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+@keyframes tt-booked-glow {
+  0%, 100% { box-shadow: 0 0 0 0 transparent; }
+  50%      { box-shadow: 0 0 20px -3px color-mix(in oklch, var(--info) 60%, transparent); }
+}
+@keyframes tt-mine-glow {
+  0%, 100% { box-shadow: 0 0 0 0 transparent; }
+  50%      { box-shadow: 0 0 22px -3px color-mix(in oklch, var(--success) 60%, transparent); }
+}
+.tt-booked-card { animation: tt-booked-glow 2.8s ease-in-out infinite; }
+.tt-mine-card { animation: tt-mine-glow 2.6s ease-in-out infinite; }
+.tt-chip-pop { animation: tt-pop 0.34s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+
+.tt-rise { animation: tt-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.tt-pop { animation: tt-pop 0.42s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.tt-float { animation: tt-float 4.5s ease-in-out infinite; }
+.tt-float-slow { animation: tt-float-slow 9s ease-in-out infinite; }
+.tt-stagger > * { animation: tt-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.tt-stagger > *:nth-child(1) { animation-delay: 0.02s; }
+.tt-stagger > *:nth-child(2) { animation-delay: 0.06s; }
+.tt-stagger > *:nth-child(3) { animation-delay: 0.10s; }
+.tt-stagger > *:nth-child(4) { animation-delay: 0.14s; }
+.tt-stagger > *:nth-child(5) { animation-delay: 0.18s; }
+.tt-stagger > *:nth-child(6) { animation-delay: 0.22s; }
+.tt-stagger > *:nth-child(7) { animation-delay: 0.26s; }
+.tt-stagger > *:nth-child(8) { animation-delay: 0.30s; }
+.tt-stagger > *:nth-child(n + 9) { animation-delay: 0.34s; }
+
+/* Hoverable cards: lift + shadow, plus a thin animated gradient ring that
+ * fades in and pans through the brand colours — a colour-animated border
+ * without touching the element's real `border` (which some cards still
+ * tint on hover for status, e.g. the booking slot cards). */
+.tt-hover-lift { position: relative; transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease; }
+.tt-hover-lift:hover { transform: translateY(-3px); box-shadow: 0 12px 28px -12px rgb(0 0 0 / 0.22); }
+.tt-hover-lift::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: linear-gradient(115deg, var(--chart-3), var(--chart-1), var(--chart-4), var(--chart-2), var(--chart-3));
+  background-size: 300% 300%;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+}
+.tt-hover-lift:hover::after { opacity: 0.85; animation: tt-gradient-pan 2.8s ease infinite; }
+
+.tt-press { transition: transform 0.12s ease; }
+.tt-press:active { transform: scale(0.96); }
+
+.tt-ready { animation: tt-ring-pulse 2.6s ease-out infinite; }
+
+.tt-brand-gradient {
+  background: linear-gradient(
+    115deg,
+    var(--chart-3),
+    var(--chart-1) 45%,
+    var(--chart-4) 75%,
+    var(--chart-2)
+  );
+  background-size: 220% 220%;
+  animation: tt-gradient-pan 14s ease infinite;
+}
+
+.tt-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--muted) 0%,
+    color-mix(in oklch, var(--muted) 60%, var(--background)) 50%,
+    var(--muted) 100%
+  );
+  background-size: 200% 100%;
+  animation: tt-shimmer 1.4s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+  .tt-hover-lift:hover { transform: none; }
+  .tt-hover-lift:hover::after { animation: none; opacity: 0.6; }
+}
