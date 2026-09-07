@@ -23,6 +23,19 @@ export function isValidYmd(s: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s + "T00:00:00Z"));
 }
 
+/** "HH:MM" (24h) for right now, in the given IANA tz (default Asia/Dhaka). */
+export function hhmmNow(tz = "Asia/Dhaka"): string {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: tz,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date());
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "00";
+  const hour = get("hour") === "24" ? "00" : get("hour");
+  return `${hour}:${get("minute")}`;
+}
+
 export function truthy(v: string | undefined | null): boolean {
   if (v == null) return false;
   return ["true", "yes", "y", "1", "active", "x", "✓"].includes(String(v).trim().toLowerCase());

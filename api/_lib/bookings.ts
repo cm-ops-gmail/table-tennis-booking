@@ -1,12 +1,12 @@
-import { readTable, appendRows, patchCells } from "./sheets";
-import { TAB } from "./schema";
-import { genId, nowIso, ymd, isValidYmd, splitList, HttpError } from "./util";
-import { getSlot, SLOTS, MIN_PLAYERS, MAX_PLAYERS } from "../../src/shared/slots";
-import type { Booking, BookingStatus, Participant } from "../../src/shared/types";
-import { resolveIds, findById, listEmployees } from "./employees";
-import { listBlockedSlots, listBlockedDates } from "./blocks";
-import { queueBookingNotifications } from "./notify";
-import { getConfig } from "./config";
+import { readTable, appendRows, patchCells } from "./sheets.js";
+import { TAB } from "./schema.js";
+import { genId, nowIso, ymd, hhmmNow, isValidYmd, splitList, HttpError } from "./util.js";
+import { getSlot, SLOTS, MIN_PLAYERS, MAX_PLAYERS } from "../../src/shared/slots.js";
+import type { Booking, BookingStatus, Participant } from "../../src/shared/types.js";
+import { resolveIds, findById, listEmployees } from "./employees.js";
+import { listBlockedSlots, listBlockedDates } from "./blocks.js";
+import { queueBookingNotifications } from "./notify.js";
+import { getConfig } from "./config.js";
 
 function parseBooking(r: Record<string, string>): Booking {
   const ids = splitList(r["Participant IDs"]);
@@ -56,13 +56,23 @@ export async function getBooking(bookingId: string, fresh = false): Promise<{ bo
   return { booking: parseBooking(t.rows[idx]), rowNumber: t.rowNumbers[idx] };
 }
 
+/** Has this slot's start time already come and gone (only meaningful for today)? */
+function hasSlotStarted(date: string, startTime: string): boolean {
+  return date === ymd() && hhmmNow() >= startTime;
+}
+
 /** All bookings an employee (by id) is part of, most recent first. */
 export async function bookingsForEmployee(employeeId: string): Promise<Booking[]> {
   const id = employeeId.trim().toLowerCase();
   const all = await listBookings();
   return all
     .filter((b) => b.participants.some((p) => p.employeeId.toLowerCase() === id))
-    .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : b.slotId - a.slotId));
+    .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : b.slotId - a.slotId))
+    .map((b) => ({
+      ...b,
+      canCancel:
+        b.status === "Confirmed" && b.ownerId.toLowerCase() === id && !hasSlotStarted(b.date, b.startTime),
+    }));
 }
 
 /* ------------------------------------------------------------------ *
@@ -88,6 +98,9 @@ export async function createBooking(input: CreateBookingInput): Promise<Booking>
 
   const today = ymd();
   if (date < today) throw new HttpError(400, "Cannot book a date in the past.");
+  if (date === today && hhmmNow() >= slot.start) {
+    throw new HttpError(409, `${slot.label} has already started or passed. Pick a later slot.`);
+  }
   const horizon = getConfig().horizonDays;
   const maxDate = ymd(new Date(Date.now() + horizon * 86400000));
   if (date > maxDate) throw new HttpError(400, `Bookings open only ${horizon} days ahead.`);
@@ -203,6 +216,9 @@ export async function cancelBooking(bookingId: string, requesterId: string): Pro
   if (booking.status === "Cancelled") throw new HttpError(409, "This booking is already cancelled.");
   if (booking.ownerId.toLowerCase() !== requesterId.trim().toLowerCase()) {
     throw new HttpError(403, "Only the employee who created the booking can cancel it.");
+  }
+  if (hasSlotStarted(booking.date, booking.startTime)) {
+    throw new HttpError(409, `${booking.slotLabel} has already started or passed and can no longer be cancelled.`);
   }
 
   const cancelledAt = nowIso();

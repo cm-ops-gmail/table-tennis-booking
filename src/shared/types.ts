@@ -1,4 +1,4 @@
-import type { SlotStatus } from "./slots";
+import type { SlotStatus } from "./slots.js";
 
 export interface Employee {
   employeeId: string;
@@ -44,6 +44,8 @@ export interface Booking {
   cancelledAt?: string;
   cancelledBy?: string;
   notes?: string;
+  /** Set for /bookings?employeeId= results: can this viewer still cancel it? */
+  canCancel?: boolean;
 }
 
 export interface SlotView {

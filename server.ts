@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { createApp } from "./api/_lib/app";
+import { createApp } from "./api/_lib/app.js";
 
 const port = Number(process.env.PORT) || 3001;
 createApp().listen(port, () => {

@@ -1,5 +1,5 @@
 import { google, sheets_v4 } from "googleapis";
-import * as mem from "./memstore";
+import * as mem from "./memstore.js";
 
 /* ------------------------------------------------------------------ *
  * Auth + client

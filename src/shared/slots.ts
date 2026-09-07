@@ -62,4 +62,4 @@ export function getSlot(id: number | string): SlotDef | undefined {
   return SLOTS.find((s) => s.id === Number(id));
 }
 
-export type SlotStatus = "available" | "booked" | "blocked" | "fullday";
+export type SlotStatus = "available" | "booked" | "blocked" | "fullday" | "past";

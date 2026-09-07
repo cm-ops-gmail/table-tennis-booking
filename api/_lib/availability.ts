@@ -1,7 +1,8 @@
-import { SLOTS } from "../../src/shared/slots";
-import type { DayAvailability, SlotView } from "../../src/shared/types";
-import { bookingsForDate } from "./bookings";
-import { listBlockedSlots, listBlockedDates } from "./blocks";
+import { SLOTS } from "../../src/shared/slots.js";
+import type { DayAvailability, SlotView } from "../../src/shared/types.js";
+import { bookingsForDate } from "./bookings.js";
+import { listBlockedSlots, listBlockedDates } from "./blocks.js";
+import { hhmmNow, ymd } from "./util.js";
 
 export async function getDayAvailability(date: string, viewerId?: string): Promise<DayAvailability> {
   const viewer = (viewerId || "").trim().toLowerCase();
@@ -15,8 +16,14 @@ export async function getDayAvailability(date: string, viewerId?: string): Promi
   const confirmed = dayBookings.filter((b) => b.status === "Confirmed");
   const slotBlocks = blockedSlots.filter((b) => b.date === date);
 
+  // Once a slot's start time has come and gone today, it's no longer bookable
+  // (and an existing booking for it can no longer be cancelled).
+  const isToday = date === ymd();
+  const nowHHMM = isToday ? hhmmNow() : "";
+
   const slots: SlotView[] = SLOTS.map((s) => {
     const base: SlotView = { id: s.id, label: s.label, start: s.start, end: s.end, status: "available" };
+    const hasStarted = isToday && nowHHMM >= s.start;
 
     if (fullDay) {
       return { ...base, status: "fullday" };
@@ -37,9 +44,12 @@ export async function getDayAvailability(date: string, viewerId?: string): Promi
           ownerId: bk.ownerId,
           players: bk.participants.map((p) => ({ name: p.name, employeeId: p.employeeId })),
           isMine,
-          canCancel: bk.ownerId.toLowerCase() === viewer,
+          canCancel: bk.ownerId.toLowerCase() === viewer && !hasStarted,
         },
       };
+    }
+    if (hasStarted) {
+      return { ...base, status: "past" };
     }
     return base;
   });

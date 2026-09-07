@@ -1,10 +1,10 @@
-import { readTable, appendRows, patchCells } from "./sheets";
-import { TAB } from "./schema";
-import { genId, nowIso, truthy, splitList, HttpError } from "./util";
-import type { QuestionType, RatingQuestion, RatingResponseRow } from "../../src/shared/types";
-import { bookingsForEmployee } from "./bookings";
-import { getConfig } from "./config";
-import { ymd } from "./util";
+import { readTable, appendRows, patchCells } from "./sheets.js";
+import { TAB } from "./schema.js";
+import { genId, nowIso, truthy, splitList, HttpError } from "./util.js";
+import type { QuestionType, RatingQuestion, RatingResponseRow } from "../../src/shared/types.js";
+import { bookingsForEmployee } from "./bookings.js";
+import { getConfig } from "./config.js";
+import { ymd } from "./util.js";
 
 const TYPES: QuestionType[] = ["star", "scale", "yesno", "choice", "text"];
 

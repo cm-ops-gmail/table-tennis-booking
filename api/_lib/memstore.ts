@@ -3,8 +3,8 @@
  * TT_MEMORY_SHEET=1 — used by `scripts/smoke.ts` and handy for a no-Google
  * local demo. Data lives only for the process lifetime.
  */
-import type { Table } from "./sheets";
-import { HEADERS, DEFAULT_QUESTIONS } from "./schema";
+import type { Table } from "./sheets.js";
+import { HEADERS, DEFAULT_QUESTIONS } from "./schema.js";
 
 type Grid = string[][]; // includes header row at index 0
 

@@ -1,7 +1,7 @@
-import { readTable } from "./sheets";
-import { TAB } from "./schema";
-import type { Employee, EmployeeLite } from "../../src/shared/types";
-import { HttpError } from "./util";
+import { readTable } from "./sheets.js";
+import { TAB } from "./schema.js";
+import type { Employee, EmployeeLite } from "../../src/shared/types.js";
+import { HttpError } from "./util.js";
 
 /** Map a variety of plausible header spellings to our canonical fields. */
 const FIELD_ALIASES: Record<keyof Employee, string[]> = {

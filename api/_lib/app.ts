@@ -1,9 +1,9 @@
 import express, { type Request, type Response, type NextFunction } from "express";
-import { HttpError, ymd, isValidYmd } from "./util";
-import { SLOTS } from "../../src/shared/slots";
-import { listEmployees, findByEmail, toLite } from "./employees";
-import { getConfig } from "./config";
-import { getDayAvailability } from "./availability";
+import { HttpError, ymd, isValidYmd } from "./util.js";
+import { SLOTS } from "../../src/shared/slots.js";
+import { listEmployees, findByEmail, toLite } from "./employees.js";
+import { getConfig } from "./config.js";
+import { getDayAvailability } from "./availability.js";
 import {
   createBooking,
   cancelBooking,
@@ -28,7 +28,7 @@ import {
   submitRating,
   ratingReport,
 } from "./ratings";
-import { adminOverview, queryBookings } from "./admin";
+import { adminOverview, queryBookings } from "./admin.js";
 
 function wrap(fn: (req: Request, res: Response) => Promise<unknown>) {
   return (req: Request, res: Response, next: NextFunction) => {

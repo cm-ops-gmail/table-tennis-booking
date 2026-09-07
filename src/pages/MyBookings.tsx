@@ -114,8 +114,7 @@ function Section({
       <div className="tt-stagger flex flex-col gap-3">
         {list.map((b) => {
           const isOwner = b.ownerId.toLowerCase() === employee.employeeId.toLowerCase();
-          const cancellable =
-            isOwner && b.status === "Confirmed" && b.date >= new Date().toISOString().slice(0, 10);
+          const cancellable = Boolean(b.canCancel);
           return (
             <Card key={b.bookingId} hover className={muted ? "opacity-80" : ""}>
               <CardContent className="flex flex-wrap items-center gap-4 pt-5">

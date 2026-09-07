@@ -1,9 +1,9 @@
-import { appendRows } from "./sheets";
-import { TAB } from "./schema";
-import { genId, nowIso } from "./util";
-import { getHrRecipient } from "./config";
-import type { Booking } from "../../src/shared/types";
-import type { Employee } from "../../src/shared/types";
+import { appendRows } from "./sheets.js";
+import { TAB } from "./schema.js";
+import { genId, nowIso } from "./util.js";
+import { getHrRecipient } from "./config.js";
+import type { Booking } from "../../src/shared/types.js";
+import type { Employee } from "../../src/shared/types.js";
 
 type NotifType = "booking_created" | "booking_cancelled";
 

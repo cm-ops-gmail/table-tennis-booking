@@ -1,9 +1,9 @@
-import type { AdminStats, Booking } from "../../src/shared/types";
-import { listBookings } from "./bookings";
-import { listBlockedSlots, listBlockedDates } from "./blocks";
-import { listResponses } from "./ratings";
-import { listEmployees } from "./employees";
-import { ymd } from "./util";
+import type { AdminStats, Booking } from "../../src/shared/types.js";
+import { listBookings } from "./bookings.js";
+import { listBlockedSlots, listBlockedDates } from "./blocks.js";
+import { listResponses } from "./ratings.js";
+import { listEmployees } from "./employees.js";
+import { ymd } from "./util.js";
 
 export interface PlayerRow {
   employeeId: string;

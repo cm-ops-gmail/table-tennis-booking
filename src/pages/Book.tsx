@@ -106,6 +106,7 @@ const STATUS_META: Record<
     chip: "bg-[color:var(--warning)]/15 text-[color:var(--warning)]",
   },
   fullday: { label: "Unavailable", dot: "bg-muted-foreground", chip: "bg-secondary text-muted-foreground" },
+  past: { label: "Time passed", dot: "bg-muted-foreground/60", chip: "bg-secondary text-muted-foreground" },
 };
 
 export default function Book() {
@@ -267,6 +268,12 @@ export default function Book() {
                   {STATUS_META[s].label}
                 </span>
               ))}
+              {day?.slots.some((s) => s.status === "past") && (
+                <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <span className={cx("h-2 w-2 rounded-full", STATUS_META.past.dot)} />
+                  {STATUS_META.past.label}
+                </span>
+              )}
             </div>
           </div>
 
@@ -296,6 +303,7 @@ export default function Book() {
                       slot.status === "blocked" &&
                         "border-[color:var(--warning)]/25 bg-[color:var(--warning)]/[0.06]",
                       slot.status === "fullday" && "border-border bg-secondary/40",
+                      slot.status === "past" && "border-border bg-secondary/30 opacity-70",
                       booked &&
                         !mine &&
                         "tt-booked-card border-[color:var(--info)]/45 bg-gradient-to-br from-[color:var(--info)]/[0.09] to-[color:var(--info)]/[0.02]",
@@ -390,12 +398,23 @@ export default function Book() {
                         {slot.blockReason || "Blocked by admin"}
                       </div>
                     )}
+                    {slot.status === "past" && (
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <span>🕓</span>
+                        This slot&apos;s time has passed.
+                      </div>
+                    )}
 
                     <div className="mt-auto pt-1">
                       {avail && (
                         <Button className="w-full" onClick={() => openBooking(slot)}>
                           Book this slot 🏓
                         </Button>
+                      )}
+                      {slot.status === "past" && (
+                        <div className="h-8 rounded-md bg-secondary/60 text-center text-xs leading-8 text-muted-foreground">
+                          No longer bookable
+                        </div>
                       )}
                       {slot.status === "booked" && slot.booking?.canCancel && (
                         <Button size="sm" variant="destructive" className="w-full" onClick={() => cancelSlot(slot)}>

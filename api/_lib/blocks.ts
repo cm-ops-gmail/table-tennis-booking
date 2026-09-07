@@ -1,8 +1,8 @@
-import { readTable, appendRows, patchCells } from "./sheets";
-import { TAB } from "./schema";
-import { genId, nowIso, truthy, HttpError } from "./util";
-import { getSlot } from "../../src/shared/slots";
-import type { BlockedSlot, BlockedDate } from "../../src/shared/types";
+import { readTable, appendRows, patchCells } from "./sheets.js";
+import { TAB } from "./schema.js";
+import { genId, nowIso, truthy, HttpError } from "./util.js";
+import { getSlot } from "../../src/shared/slots.js";
+import type { BlockedSlot, BlockedDate } from "../../src/shared/types.js";
 
 /** All active rows of the merged Blocks tab. */
 async function activeBlocks() {
