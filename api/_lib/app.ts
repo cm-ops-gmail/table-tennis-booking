@@ -9,7 +9,7 @@ import {
   cancelBooking,
   bookingsForEmployee,
   bookingsForDate,
-} from "./bookings";
+} from "./bookings.js";
 import {
   listBlockedSlots,
   listBlockedDates,
@@ -18,7 +18,7 @@ import {
   unblockSlot,
   unblockDate,
   updateBlockNote,
-} from "./blocks";
+} from "./blocks.js";
 import {
   listQuestions,
   addQuestion,
@@ -27,7 +27,7 @@ import {
   ratableBookings,
   submitRating,
   ratingReport,
-} from "./ratings";
+} from "./ratings.js";
 import { adminOverview, queryBookings } from "./admin.js";
 
 function wrap(fn: (req: Request, res: Response) => Promise<unknown>) {
