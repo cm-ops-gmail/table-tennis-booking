@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Button, Card, CardContent, cx } from "../components/ui";
 import { burstConfetti } from "../lib/confetti";
@@ -85,6 +85,8 @@ const other = (w: "you" | "cpu") => (w === "you" ? "cpu" : "you");
 
 export default function Play() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const boxRef = useRef<HTMLDivElement>(null);
+  const [boxWidth, setBoxWidth] = useState<number | null>(null);
   const diffRef = useRef<Diff>("normal");
   const rafRef = useRef(0);
   const serverRef = useRef<"you" | "cpu">("you");
@@ -518,6 +520,49 @@ export default function Play() {
     return () => cancelAnimationFrame(rafRef.current);
   }, [endPoint]);
 
+  // Size the table itself: as wide as the layout allows (~90vw on phones,
+  // ~82vw on desktop), but never so tall that the page has to scroll — the
+  // table's own height (width / 1.5) plus everything else on the page must
+  // fit inside the actual window. Measured fresh on every resize, so it's
+  // correct regardless of how much chrome surrounds it.
+  useLayoutEffect(() => {
+    function fit() {
+      const box = boxRef.current;
+      if (!box || !box.parentElement) return;
+      const vw = window.innerWidth;
+      const isDesktop = vw >= 640;
+      const desired = isDesktop ? Math.min(vw * 0.82, 1400) : vw * 0.97;
+
+      // Never ask for more than the parent card actually has to give — a
+      // flex row centers items that fit, but pins ones that don't to its
+      // start edge, so an over-wide box here would spill out one side
+      // instead of overflowing evenly. Measuring the real content width
+      // keeps this correct regardless of card padding on any breakpoint.
+      const parent = box.parentElement;
+      const parentStyle = getComputedStyle(parent);
+      const parentContentWidth =
+        parent.clientWidth - parseFloat(parentStyle.paddingLeft || "0") - parseFloat(parentStyle.paddingRight || "0");
+      const widthCap = Math.min(desired, parentContentWidth);
+
+      // Phones have plenty of headroom below the table and scroll fine, so
+      // only desktop needs the height check that keeps the page unscrolled.
+      if (!isDesktop) {
+        setBoxWidth(Math.round(widthCap));
+        return;
+      }
+
+      const boxHeight = box.getBoundingClientRect().height;
+      const chromeHeight = document.documentElement.scrollHeight - boxHeight;
+      const availableHeight = window.innerHeight - chromeHeight - 8;
+      const heightCap = availableHeight * (CW / CH);
+
+      setBoxWidth(Math.round(Math.max(240, Math.min(widthCap, heightCap))));
+    }
+    fit();
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+  }, []);
+
   const showOverlay = phase !== "rally";
 
   return (
@@ -526,21 +571,36 @@ export default function Play() {
     // a game screen benefits from using the whole window, unlike the reading
     // -width pages around it.
     <div className="relative left-1/2 w-screen -translate-x-1/2 px-1.5 sm:px-6">
-      <div className="mx-auto flex w-[97vw] max-w-[1400px] flex-col gap-4 sm:w-[82vw]">
-        <div className="flex items-center justify-between">
+      <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <h1 className="flex items-center gap-2 text-xl font-semibold">
             <span>🏓</span> Table Tennis · vs Computer
           </h1>
-          <Link
-            to="/"
-            className="rounded-md border border-input px-3 py-1.5 text-sm font-medium no-underline transition-colors hover:bg-accent"
-          >
-            ← Back to booking
-          </Link>
+          <div className="flex items-center gap-2">
+            <span className="hidden text-xs text-muted-foreground sm:inline">Difficulty</span>
+            {(["easy", "normal", "hard"] as Diff[]).map((d) => (
+              <button
+                key={d}
+                onClick={() => setDiff(d)}
+                className={cx(
+                  "tt-press rounded-md border px-3 py-1 text-xs font-medium capitalize transition-colors",
+                  diff === d ? "border-primary bg-primary text-primary-foreground" : "border-input hover:bg-accent"
+                )}
+              >
+                {d}
+              </button>
+            ))}
+            <Link
+              to="/"
+              className="ml-1 rounded-md border border-input px-3 py-1.5 text-sm font-medium no-underline transition-colors hover:bg-accent"
+            >
+              ← Back
+            </Link>
+          </div>
         </div>
 
         <Card>
-          <CardContent className="flex flex-col items-center gap-4 px-3 pt-5 sm:px-5">
+          <CardContent className="flex flex-col items-center gap-3 px-3 pt-4 sm:px-5">
             <div className="flex w-full items-center justify-between text-sm">
               <div className="flex items-center gap-2">
                 <span className="h-3 w-3 rounded-sm bg-[color:var(--success)]" />
@@ -555,7 +615,11 @@ export default function Play() {
               </div>
             </div>
 
-            <div className="relative w-full">
+            <div
+              ref={boxRef}
+              className="relative mx-auto w-full"
+              style={boxWidth ? { width: boxWidth } : undefined}
+            >
               <canvas
                 ref={canvasRef}
                 width={CW}
@@ -581,7 +645,7 @@ export default function Play() {
                       <div className="mt-1 text-sm text-muted-foreground">
                         Move the mouse (or drag your finger) to slide your paddle left–right and
                         lift it up–down. Let the ball bounce on your half, then swing it back over
-                        the net.
+                        the net. Just for fun — nothing is saved.
                       </div>
                     </div>
                   ) : (
@@ -595,26 +659,6 @@ export default function Play() {
                 </div>
               )}
             </div>
-
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">Difficulty</span>
-              {(["easy", "normal", "hard"] as Diff[]).map((d) => (
-                <button
-                  key={d}
-                  onClick={() => setDiff(d)}
-                  className={cx(
-                    "tt-press rounded-md border px-3 py-1 text-xs font-medium capitalize transition-colors",
-                    diff === d ? "border-primary bg-primary text-primary-foreground" : "border-input hover:bg-accent"
-                  )}
-                >
-                  {d}
-                </button>
-              ))}
-            </div>
-
-            <p className="text-center text-xs text-muted-foreground">
-              Just for fun while a real table frees up — nothing is saved.
-            </p>
           </CardContent>
         </Card>
       </div>

@@ -112,16 +112,23 @@ function Shell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <main key={location.pathname} className="tt-rise mx-auto max-w-6xl px-4 py-6">
+      <main
+        key={location.pathname}
+        className={cx("tt-rise mx-auto max-w-6xl px-4", location.pathname === "/play" ? "pt-4 pb-2" : "py-6")}
+      >
         {children}
       </main>
 
-      <footer className="mx-auto max-w-6xl px-4 pb-10 pt-4 text-center text-xs text-muted-foreground">
-        🏓 Internal facility tool · Operating hours 1:00 PM – 5:30 PM · one match per person per day ·{" "}
-        <Link to="/admin" className="underline decoration-dotted underline-offset-2 hover:text-foreground">
-          Admin
-        </Link>
-      </footer>
+      {/* The game wants every spare pixel of height, so it skips the standard
+          footer disclaimer rather than fight it for vertical space. */}
+      {location.pathname !== "/play" && (
+        <footer className="mx-auto max-w-6xl px-4 pb-10 pt-4 text-center text-xs text-muted-foreground">
+          🏓 Internal facility tool · Operating hours 1:00 PM – 5:30 PM · one match per person per day ·{" "}
+          <Link to="/admin" className="underline decoration-dotted underline-offset-2 hover:text-foreground">
+            Admin
+          </Link>
+        </footer>
+      )}
       <Toaster />
     </div>
   );

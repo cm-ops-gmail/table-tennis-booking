@@ -58,16 +58,6 @@ function WelcomeHero({ name }: { name: string }) {
   );
 }
 
-function initials(name: string) {
-  return name
-    .split(" ")
-    .map((w) => w[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-}
-
 function addDays(ymd: string, n: number): string {
   const d = new Date(ymd + "T00:00:00");
   d.setDate(d.getDate() + n);
@@ -363,28 +353,15 @@ export default function Book() {
                               <span
                                 key={p.employeeId + k}
                                 className={cx(
-                                  "tt-chip-pop inline-flex items-center gap-1.5 rounded-full border py-0.5 pl-0.5 pr-2 text-xs",
+                                  "tt-chip-pop inline-flex items-center gap-1 rounded-full border px-2.5 py-1 font-mono text-xs",
                                   isOwner
-                                    ? "border-[color:var(--info)]/40 bg-[color:var(--info)]/10"
-                                    : "border-border bg-card"
+                                    ? "border-[color:var(--info)]/40 bg-[color:var(--info)]/10 text-[color:var(--info)]"
+                                    : "border-border bg-card text-foreground"
                                 )}
                                 style={{ animationDelay: `${k * 45}ms` }}
-                                title={`${p.name} · ${p.employeeId}`}
+                                title={p.employeeId}
                               >
-                                <span
-                                  className={cx(
-                                    "grid h-5 w-5 shrink-0 place-items-center rounded-full text-[9px] font-bold",
-                                    isOwner
-                                      ? "bg-[color:var(--info)] text-white"
-                                      : "bg-secondary text-foreground"
-                                  )}
-                                >
-                                  {initials(p.name)}
-                                </span>
-                                <span className="font-medium">{p.name.split(" ")[0]}</span>
-                                <span className="font-mono text-[10px] text-muted-foreground">
-                                  {p.employeeId}
-                                </span>
+                                {p.employeeId}
                                 {isOwner && <span className="text-[10px]">👑</span>}
                               </span>
                             );
