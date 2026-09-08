@@ -128,7 +128,7 @@ export async function submitRating(input: {
   const booking = mine.find((b) => b.bookingId === bookingId);
   if (!booking) throw new HttpError(403, "You can only rate matches you took part in.");
 
-  const allowEdit = getConfig().allowRatingEdit;
+  const allowEdit = (await getConfig()).allowRatingEdit;
   const prior = (await listResponses()).filter(
     (r) => r.bookingId === bookingId && r.employeeId.toLowerCase() === employeeId.toLowerCase()
   );

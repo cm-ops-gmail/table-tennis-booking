@@ -289,6 +289,78 @@ async function main() {
     });
     ok("booking allowed once everyone has rated their last match", unblocked.status === 201, JSON.stringify(unblocked.body));
 
+    console.log("\nadmin: blocked users");
+    const blockUser = await call("/admin/blocks/user", {
+      admin: true,
+      body: { email: "eve@10ms.test", reason: "policy violation", by: "admin" },
+    });
+    ok("admin blocks a user by email (201)", blockUser.status === 201, JSON.stringify(blockUser.body));
+    const userBlockId = blockUser.body.block?.blockId;
+
+    const dupeBlock = await call("/admin/blocks/user", {
+      admin: true,
+      body: { email: "EVE@10ms.test", reason: "dup", by: "admin" },
+    });
+    ok("blocking an already-blocked email is rejected (409)", dupeBlock.status === 409);
+
+    const badEmail = await call("/admin/blocks/user", {
+      admin: true,
+      body: { email: "not-an-email", reason: "", by: "admin" },
+    });
+    ok("blocking an invalid email is rejected (400)", badEmail.status === 400);
+
+    const blocksList = await call("/admin/blocks", { admin: true });
+    ok(
+      "blocked-users list includes the block",
+      Array.isArray(blocksList.body.users) && blocksList.body.users.some((u: any) => u.email === "eve@10ms.test")
+    );
+
+    const blockedAsParticipant = await call("/bookings", {
+      body: { ownerId: "E3", participantIds: ["E5"], date: futureDate(7), slotId: 1 },
+    });
+    ok(
+      "cannot book with a blocked teammate (403)",
+      blockedAsParticipant.status === 403 && /Eve Chowdhury/.test(blockedAsParticipant.body.error)
+    );
+
+    const blockedAsOwner = await call("/bookings", {
+      body: { ownerId: "E5", participantIds: ["E3"], date: futureDate(7), slotId: 1 },
+    });
+    ok("cannot book as a blocked owner (403)", blockedAsOwner.status === 403);
+
+    const unblockUser = await call(`/admin/blocks/user/${userBlockId}`, { admin: true, method: "DELETE" });
+    ok("admin unblocks the user", unblockUser.status === 200);
+
+    const afterUnblock = await call("/bookings", {
+      body: { ownerId: "E3", participantIds: ["E5"], date: futureDate(7), slotId: 1 },
+    });
+    ok("booking allowed again after unblocking", afterUnblock.status === 201, JSON.stringify(afterUnblock.body));
+
+    console.log("\nconfig: timing lives in the sheet");
+    const { memReadTable: readCfg, memPatchCells: patchCfg } = await import("../api/_lib/memstore");
+    function setConfigValue(key: string, value: string) {
+      const t = readCfg("Config");
+      const idx = t.rows.findIndex((r) => r["Key"] === key);
+      if (idx === -1) throw new Error(`Config key not seeded: ${key}`);
+      patchCfg("Config", t.rowNumbers[idx], { Value: value });
+    }
+    const defaultCfg = await call("/config");
+    ok("config defaults to 7 slots starting 1:00 PM", defaultCfg.body.slots.length === 7 && defaultCfg.body.slots[0].start === "13:00");
+
+    setConfigValue("SLOT_COUNT", "3");
+    setConfigValue("FACILITY_START", "09:00");
+    const editedCfg = await call("/config");
+    ok(
+      "editing the Config tab changes slot count and start time",
+      editedCfg.body.slots.length === 3 && editedCfg.body.slots[0].start === "09:00",
+      JSON.stringify(editedCfg.body.slots)
+    );
+    // Restore, so nothing downstream (or a re-run) is affected.
+    setConfigValue("SLOT_COUNT", "7");
+    setConfigValue("FACILITY_START", "13:00");
+    const restoredCfg = await call("/config");
+    ok("config reverts cleanly once the sheet values are restored", restoredCfg.body.slots.length === 7);
+
     console.log(`\n${pass} passed, ${fail} failed\n`);
     process.exitCode = fail === 0 ? 0 : 1;
   } finally {

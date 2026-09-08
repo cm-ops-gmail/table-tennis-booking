@@ -1,12 +1,12 @@
 import { readTable, appendRows, patchCells } from "./sheets.js";
 import { TAB } from "./schema.js";
 import { genId, nowIso, ymd, hhmmNow, isValidYmd, splitList, HttpError } from "./util.js";
-import { getSlot, SLOTS, MIN_PLAYERS, MAX_PLAYERS } from "../../src/shared/slots.js";
+import { MIN_PLAYERS, MAX_PLAYERS } from "../../src/shared/slots.js";
 import type { Booking, BookingStatus, Participant } from "../../src/shared/types.js";
 import { resolveIds, findById, listEmployees } from "./employees.js";
-import { listBlockedSlots, listBlockedDates } from "./blocks.js";
+import { listBlockedSlots, listBlockedDates, listBlockedUsers } from "./blocks.js";
 import { queueBookingNotifications } from "./notify.js";
-import { getConfig } from "./config.js";
+import { getConfig, getSlots } from "./config.js";
 
 function parseBooking(r: Record<string, string>): Booking {
   const ids = splitList(r["Participant IDs"]);
@@ -140,7 +140,8 @@ export async function createBooking(input: CreateBookingInput): Promise<Booking>
 
   // --- basic shape -------------------------------------------------
   if (!isValidYmd(date)) throw new HttpError(400, "Invalid date.");
-  const slot = getSlot(slotId);
+  const slots = await getSlots();
+  const slot = slots.find((s) => s.id === slotId);
   if (!slot) throw new HttpError(400, "Invalid slot.");
 
   const today = ymd();
@@ -148,7 +149,7 @@ export async function createBooking(input: CreateBookingInput): Promise<Booking>
   if (date === today && hhmmNow() >= slot.start) {
     throw new HttpError(409, `${slot.label} has already started or passed. Pick a later slot.`);
   }
-  const horizon = getConfig().horizonDays;
+  const horizon = (await getConfig()).horizonDays;
   const maxDate = ymd(new Date(Date.now() + horizon * 86400000));
   if (date > maxDate) throw new HttpError(400, `Bookings open only ${horizon} days ahead.`);
 
@@ -168,6 +169,19 @@ export async function createBooking(input: CreateBookingInput): Promise<Booking>
   if (people.length > MAX_PLAYERS) throw new HttpError(400, `A booking allows at most ${MAX_PLAYERS} players.`);
   for (const p of people) {
     if (!p.name || !p.employeeId) throw new HttpError(400, `Missing name or ID for ${p.email || "a participant"}.`);
+  }
+
+  // --- admin block list ------------------------------------------
+  // A blocked email can't book, and can't be added to someone else's
+  // booking either, until HR unblocks it.
+  const blockedEmails = new Set((await listBlockedUsers()).map((b) => b.email.toLowerCase()));
+  const blockedPeople = people.filter((p) => p.email && blockedEmails.has(p.email.toLowerCase()));
+  if (blockedPeople.length) {
+    const who = blockedPeople.map((p) => p.name).join(", ");
+    throw new HttpError(
+      403,
+      `${who} ${blockedPeople.length > 1 ? "are" : "is"} blocked from booking by an administrator. Contact HR to be unblocked.`
+    );
   }
 
   // --- outstanding feedback gate ----------------------------------
@@ -301,4 +315,4 @@ export async function cancelBooking(bookingId: string, requesterId: string): Pro
   return cancelled;
 }
 
-export { SLOTS, hasSlotStarted };
+export { hasSlotStarted };

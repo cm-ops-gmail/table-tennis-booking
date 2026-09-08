@@ -1,15 +1,16 @@
-import { SLOTS } from "../../src/shared/slots.js";
 import type { DayAvailability, SlotView } from "../../src/shared/types.js";
 import { bookingsForDate } from "./bookings.js";
 import { listBlockedSlots, listBlockedDates } from "./blocks.js";
+import { getSlots } from "./config.js";
 import { hhmmNow, ymd } from "./util.js";
 
 export async function getDayAvailability(date: string, viewerId?: string): Promise<DayAvailability> {
   const viewer = (viewerId || "").trim().toLowerCase();
-  const [dayBookings, blockedSlots, blockedDates] = await Promise.all([
+  const [dayBookings, blockedSlots, blockedDates, SLOTS] = await Promise.all([
     bookingsForDate(date),
     listBlockedSlots(),
     listBlockedDates(),
+    getSlots(),
   ]);
 
   const fullDay = blockedDates.find((b) => b.date === date);

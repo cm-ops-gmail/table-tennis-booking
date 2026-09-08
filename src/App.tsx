@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, NavLink, Route, Routes, useNavigate, Navigate, useLocation } from "react-router-dom";
 import { Button, cx } from "./components/ui";
 import { Toaster } from "./components/Toaster";
+import { api } from "./lib/api";
+import { to12h } from "./shared/slots";
 import { getEmployee, initTheme, isDark, setEmployee, toggleTheme, useEmployee } from "./lib/session";
 import Login from "./pages/Login";
 import Book from "./pages/Book";
@@ -43,6 +45,14 @@ function Shell({ children }: { children: React.ReactNode }) {
   const employee = useEmployee();
   const navigate = useNavigate();
   const location = useLocation();
+  // Operating hours are set in the sheet's Config tab now, not hardcoded —
+  // fetch once so the footer never drifts from the real slot timing.
+  const [hours, setHours] = useState<{ start: string; end: string } | null>(null);
+  useEffect(() => {
+    api<{ facility: { start: string; end: string } }>("/config")
+      .then((c) => setHours(c.facility))
+      .catch(() => {});
+  }, []);
 
   return (
     <div className="min-h-full">
@@ -123,7 +133,9 @@ function Shell({ children }: { children: React.ReactNode }) {
           footer disclaimer rather than fight it for vertical space. */}
       {location.pathname !== "/play" && (
         <footer className="mx-auto max-w-6xl px-4 pb-10 pt-4 text-center text-xs text-muted-foreground">
-          🏓 Internal facility tool · Operating hours 1:00 PM – 5:30 PM · one match per person per day ·{" "}
+          🏓 Internal facility tool · Operating hours{" "}
+          {hours ? `${to12h(hours.start)} – ${to12h(hours.end)}` : "1:00 PM – 5:30 PM"} · one match per person per
+          day ·{" "}
           <Link to="/admin" className="underline decoration-dotted underline-offset-2 hover:text-foreground">
             Admin
           </Link>

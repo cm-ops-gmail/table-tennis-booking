@@ -92,6 +92,14 @@ export interface BlockedDate {
   createdBy: string;
 }
 
+export interface BlockedUser {
+  blockId: string;
+  email: string;
+  reason: string;
+  createdAt: string;
+  createdBy: string;
+}
+
 export type QuestionType = "star" | "scale" | "yesno" | "choice" | "text";
 
 export interface RatingQuestion {

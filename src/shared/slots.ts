@@ -45,17 +45,35 @@ export function to12h(hhmm: string): string {
   return `${h12}:${pad(m)} ${period}`;
 }
 
-export const SLOTS: SlotDef[] = Array.from({ length: SLOT_COUNT }, (_, i) => {
-  const startMin = toMinutes(FACILITY_START) + i * (MATCH_MINUTES + GAP_MINUTES);
-  const endMin = startMin + MATCH_MINUTES;
-  const start = fromMinutes(startMin);
-  const end = fromMinutes(endMin);
-  return {
-    id: i + 1,
-    start,
-    end,
-    label: `${to12h(start)} – ${to12h(end)}`,
-  };
+/** Pure slot generator — the backend calls this with sheet-configured
+ *  timing (see api/_lib/config.ts); the constants below are just the
+ *  fallback used for the static `SLOTS` export. */
+export function buildSlots(opts: {
+  facilityStart: string;
+  matchMinutes: number;
+  gapMinutes: number;
+  slotCount: number;
+}): SlotDef[] {
+  const { facilityStart, matchMinutes, gapMinutes, slotCount } = opts;
+  return Array.from({ length: slotCount }, (_, i) => {
+    const startMin = toMinutes(facilityStart) + i * (matchMinutes + gapMinutes);
+    const endMin = startMin + matchMinutes;
+    const start = fromMinutes(startMin);
+    const end = fromMinutes(endMin);
+    return {
+      id: i + 1,
+      start,
+      end,
+      label: `${to12h(start)} – ${to12h(end)}`,
+    };
+  });
+}
+
+export const SLOTS: SlotDef[] = buildSlots({
+  facilityStart: FACILITY_START,
+  matchMinutes: MATCH_MINUTES,
+  gapMinutes: GAP_MINUTES,
+  slotCount: SLOT_COUNT,
 });
 
 export function getSlot(id: number | string): SlotDef | undefined {

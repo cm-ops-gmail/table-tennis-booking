@@ -1,8 +1,7 @@
 import express, { type Request, type Response, type NextFunction } from "express";
 import { HttpError, ymd, isValidYmd } from "./util.js";
-import { SLOTS } from "../../src/shared/slots.js";
 import { listEmployees, findByEmail, toLite } from "./employees.js";
-import { getConfig } from "./config.js";
+import { getConfig, getSlots } from "./config.js";
 import { getDayAvailability } from "./availability.js";
 import {
   createBooking,
@@ -13,10 +12,13 @@ import {
 import {
   listBlockedSlots,
   listBlockedDates,
+  listBlockedUsers,
   blockSlot,
   blockDate,
+  blockUser,
   unblockSlot,
   unblockDate,
+  unblockUser,
   updateBlockNote,
 } from "./blocks.js";
 import {
@@ -56,9 +58,9 @@ export function createApp() {
   api.get(
     "/config",
     wrap(async (_req, res) => {
-      const cfg = getConfig();
+      const [cfg, slots] = await Promise.all([getConfig(), getSlots()]);
       res.json({
-        slots: SLOTS,
+        slots,
         today: ymd(),
         horizonDays: cfg.horizonDays,
         facility: { start: cfg.facilityStart, end: cfg.facilityEnd },
@@ -215,8 +217,8 @@ export function createApp() {
   admin.get(
     "/blocks",
     wrap(async (_req, res) => {
-      const [slots, dates] = await Promise.all([listBlockedSlots(), listBlockedDates()]);
-      res.json({ slots, dates });
+      const [slots, dates, users] = await Promise.all([listBlockedSlots(), listBlockedDates(), listBlockedUsers()]);
+      res.json({ slots, dates, users });
     })
   );
 
@@ -235,6 +237,14 @@ export function createApp() {
       const { date, reason, by } = req.body || {};
       if (!isValidYmd(String(date || ""))) throw new HttpError(400, "Invalid date.");
       res.status(201).json({ block: await blockDate(String(date), String(reason || ""), String(by || "admin")) });
+    })
+  );
+
+  admin.post(
+    "/blocks/user",
+    wrap(async (req, res) => {
+      const { email, reason, by } = req.body || {};
+      res.status(201).json({ block: await blockUser(String(email || ""), String(reason || ""), String(by || "admin")) });
     })
   );
 
@@ -259,6 +269,14 @@ export function createApp() {
     "/blocks/date/:id",
     wrap(async (req, res) => {
       await unblockDate(req.params.id);
+      res.json({ ok: true });
+    })
+  );
+
+  admin.delete(
+    "/blocks/user/:id",
+    wrap(async (req, res) => {
+      await unblockUser(req.params.id);
       res.json({ ok: true });
     })
   );

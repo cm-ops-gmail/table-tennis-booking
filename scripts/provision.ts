@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { listTabs, createTab, ensureHeaders, readTable, appendRows } from "../api/_lib/sheets";
-import { TAB, HEADERS, DEFAULT_QUESTIONS } from "../api/_lib/schema";
+import { TAB, HEADERS, DEFAULT_QUESTIONS, DEFAULT_CONFIG } from "../api/_lib/schema";
 import { genId, nowIso } from "../api/_lib/util";
 
 async function main() {
@@ -36,6 +36,19 @@ async function main() {
         Active: "TRUE",
         "Created At": nowIso(),
       }))
+    );
+  }
+
+  // Seed default settings on first run — HR can edit values in the sheet
+  // afterward; this only fills in rows that don't exist yet.
+  const cfg = await readTable(TAB.Config, { fresh: true });
+  const existingKeys = new Set(cfg.rows.map((r) => r["Key"]));
+  const missingConfig = DEFAULT_CONFIG.filter((c) => !existingKeys.has(c.key));
+  if (missingConfig.length) {
+    console.log(`+ seeding ${missingConfig.length} default Config row(s)`);
+    await appendRows(
+      TAB.Config,
+      missingConfig.map((c) => ({ Key: c.key, Value: c.value, Description: c.description }))
     );
   }
 

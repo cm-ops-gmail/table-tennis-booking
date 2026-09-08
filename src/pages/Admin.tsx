@@ -6,11 +6,12 @@ import type {
   Booking,
   BlockedDate,
   BlockedSlot,
+  BlockedUser,
   DayAvailability,
   EmployeeLite,
   RatingQuestion,
 } from "../shared/types";
-import { SLOTS } from "../shared/slots";
+import type { SlotDef } from "../shared/slots";
 import { EmployeePicker } from "../components/EmployeePicker";
 import { toast } from "../components/Toaster";
 import { burstConfetti } from "../lib/confetti";
@@ -132,6 +133,7 @@ export default function Admin() {
           <TabsTrigger value="bookings">📒 Bookings</TabsTrigger>
           <TabsTrigger value="slots">⛔ Slot blocking</TabsTrigger>
           <TabsTrigger value="dates">🚧 Date blocking</TabsTrigger>
+          <TabsTrigger value="users">🚫 Blocked users</TabsTrigger>
           <TabsTrigger value="questions">❓ Rating questions</TabsTrigger>
           <TabsTrigger value="reports">⭐ Feedback</TabsTrigger>
         </TabsList>
@@ -149,6 +151,9 @@ export default function Admin() {
         </TabsContent>
         <TabsContent value="dates">
           <DateBlocking />
+        </TabsContent>
+        <TabsContent value="users">
+          <UserBlocking />
         </TabsContent>
         <TabsContent value="questions">
           <QuestionsAdmin />
@@ -183,6 +188,13 @@ function useAsync<T>(fn: () => Promise<T>, deps: unknown[]) {
     run();
   }, [run]);
   return { data, loading, error, reload: run };
+}
+
+/** The day's slots, as configured in the sheet's Config tab (timing can
+ *  change without a redeploy, so this is never the static default list). */
+function useConfigSlots(): SlotDef[] {
+  const { data } = useAsync(() => api<{ slots: SlotDef[] }>("/config"), []);
+  return data?.slots ?? [];
 }
 
 function Loader() {
@@ -645,11 +657,12 @@ function BookingsAdmin() {
 
 function AdminBookingDialog({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const [employees, setEmployees] = useState<EmployeeLite[]>([]);
+  const [slots, setSlots] = useState<SlotDef[]>([]);
   const [today, setToday] = useState("");
   const [ownerId, setOwnerId] = useState("");
   const [participants, setParticipants] = useState<string[]>([]);
   const [date, setDate] = useState("");
-  const [slotId, setSlotId] = useState(String(SLOTS[0].id));
+  const [slotId, setSlotId] = useState("");
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -658,11 +671,13 @@ function AdminBookingDialog({ onClose, onCreated }: { onClose: () => void; onCre
     (async () => {
       const [e, c] = await Promise.all([
         api<{ employees: EmployeeLite[] }>("/employees"),
-        api<{ today: string }>("/config"),
+        api<{ today: string; slots: SlotDef[] }>("/config"),
       ]);
       setEmployees(e.employees);
       setToday(c.today);
       setDate(c.today);
+      setSlots(c.slots);
+      setSlotId(String(c.slots[0]?.id ?? ""));
     })();
   }, []);
 
@@ -724,7 +739,7 @@ function AdminBookingDialog({ onClose, onCreated }: { onClose: () => void; onCre
           </Field>
           <Field label="Slot">
             <Select value={slotId} onChange={(e) => setSlotId(e.target.value)}>
-              {SLOTS.map((s) => (
+              {slots.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.label}
                 </option>
@@ -763,13 +778,18 @@ function SlotBlocking() {
     () => api<{ slots: BlockedSlot[]; dates: BlockedDate[] }>("/admin/blocks", { admin: true }),
     []
   );
+  const configSlots = useConfigSlots();
   const employee = useEmployee();
   const [date, setDate] = useState("");
-  const [slotId, setSlotId] = useState(String(SLOTS[0].id));
+  const [slotId, setSlotId] = useState("");
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [formErr, setFormErr] = useState("");
   const [edit, setEdit] = useState<BlockedSlot | null>(null);
+
+  useEffect(() => {
+    if (!slotId && configSlots.length) setSlotId(String(configSlots[0].id));
+  }, [configSlots, slotId]);
 
   async function submit() {
     setBusy(true);
@@ -798,7 +818,7 @@ function SlotBlocking() {
           </Field>
           <Field label="Slot">
             <Select value={slotId} onChange={(e) => setSlotId(e.target.value)}>
-              {SLOTS.map((s) => (
+              {configSlots.map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.label}
                 </option>
@@ -980,6 +1000,108 @@ function DateBlocking() {
           reload();
         }}
       />
+    </div>
+  );
+}
+
+/* ---------------- Blocked users ---------------- */
+function UserBlocking() {
+  const { data, loading, error, reload } = useAsync(
+    () => api<{ users: BlockedUser[] }>("/admin/blocks", { admin: true }),
+    []
+  );
+  const employee = useEmployee();
+  const [email, setEmail] = useState("");
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [formErr, setFormErr] = useState("");
+
+  async function submit() {
+    setBusy(true);
+    setFormErr("");
+    try {
+      await api("/admin/blocks/user", {
+        admin: true,
+        body: { email, reason, by: employee?.name || "admin" },
+      });
+      setEmail("");
+      setReason("");
+      reload();
+    } catch (e) {
+      setFormErr(e instanceof ApiError ? e.message : "Failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-5">
+      <Card>
+        <CardContent className="grid gap-3 pt-5 sm:grid-cols-3">
+          <Field label="Employee email">
+            <Input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="name@10minuteschool.com"
+            />
+          </Field>
+          <Field label="Reason">
+            <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. policy violation" />
+          </Field>
+          <div className="flex items-end">
+            <Button onClick={submit} loading={busy} disabled={!email.trim()}>
+              Block from booking
+            </Button>
+          </div>
+          {formErr && (
+            <div className="sm:col-span-3">
+              <Alert tone="error">{formErr}</Alert>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent className="pt-5">
+          <h3 className="mb-3 text-sm font-semibold">Blocked from booking</h3>
+          <p className="mb-3 text-xs text-muted-foreground">
+            A blocked email can't create a booking, and can't be added to anyone else's booking either — as owner
+            or teammate — until removed here.
+          </p>
+          {loading ? (
+            <Loader />
+          ) : error ? (
+            <Alert tone="error">{error}</Alert>
+          ) : !data?.users.length ? (
+            <EmptyState title="No one is blocked" />
+          ) : (
+            <div className="flex flex-col gap-2">
+              {data.users.map((b) => (
+                <div
+                  key={b.blockId}
+                  className="flex flex-wrap items-center gap-3 rounded-md border border-border px-3 py-2 text-sm"
+                >
+                  <span className="font-medium">{b.email}</span>
+                  <span className="text-muted-foreground">{b.reason || "—"}</span>
+                  <div className="ml-auto flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={async () => {
+                        await api(`/admin/blocks/user/${b.blockId}`, { admin: true, method: "DELETE" });
+                        reload();
+                      }}
+                    >
+                      Unblock
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

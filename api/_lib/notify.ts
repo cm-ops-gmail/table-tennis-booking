@@ -34,7 +34,7 @@ export async function queueBookingNotifications(
   type: NotifType,
   managers: Pick<Employee, "employeeId" | "name" | "lineManagerName" | "lineManagerEmail">[]
 ): Promise<void> {
-  const hr = getHrRecipient();
+  const hr = await getHrRecipient();
   const verb = type === "booking_created" ? "confirmed" : "cancelled";
   const rows: OutboxRow[] = [];
 

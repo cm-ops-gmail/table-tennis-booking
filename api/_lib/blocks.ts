@@ -1,8 +1,8 @@
 import { readTable, appendRows, patchCells } from "./sheets.js";
 import { TAB } from "./schema.js";
 import { genId, nowIso, truthy, HttpError } from "./util.js";
-import { getSlot } from "../../src/shared/slots.js";
-import type { BlockedSlot, BlockedDate } from "../../src/shared/types.js";
+import { getSlots } from "./config.js";
+import type { BlockedSlot, BlockedDate, BlockedUser } from "../../src/shared/types.js";
 
 /** All active rows of the merged Blocks tab. */
 async function activeBlocks() {
@@ -36,13 +36,26 @@ export async function listBlockedDates(): Promise<BlockedDate[]> {
     }));
 }
 
+/** Employees an administrator has barred from booking, by email. */
+export async function listBlockedUsers(): Promise<BlockedUser[]> {
+  return (await activeBlocks())
+    .filter((r) => (r["Type"] || "").toLowerCase() === "user")
+    .map((r) => ({
+      blockId: r["Block ID"],
+      email: (r["Email"] || "").toLowerCase(),
+      reason: r["Reason"] || "",
+      createdAt: r["Created At"],
+      createdBy: r["Created By"],
+    }));
+}
+
 export async function blockSlot(
   date: string,
   slotId: number,
   reason: string,
   by: string
 ): Promise<BlockedSlot> {
-  const slot = getSlot(slotId);
+  const slot = (await getSlots()).find((s) => s.id === slotId);
   if (!slot) throw new HttpError(400, `Unknown slot: ${slotId}`);
   if ((await listBlockedSlots()).some((b) => b.date === date && b.slotId === slotId)) {
     throw new HttpError(409, "That slot is already blocked.");
@@ -53,6 +66,7 @@ export async function blockSlot(
     Date: date,
     "Slot ID": slotId,
     "Slot Label": slot.label,
+    Email: "",
     Reason: reason || "",
     "Created At": nowIso(),
     "Created By": by,
@@ -80,6 +94,7 @@ export async function blockDate(date: string, reason: string, by: string): Promi
     Date: date,
     "Slot ID": "",
     "Slot Label": "",
+    Email: "",
     Reason: reason || "",
     "Created At": nowIso(),
     "Created By": by,
@@ -87,6 +102,34 @@ export async function blockDate(date: string, reason: string, by: string): Promi
   };
   await appendRows(TAB.Blocks, [row]);
   return { blockId: row["Block ID"], date, reason: reason || "", createdAt: row["Created At"], createdBy: by };
+}
+
+export async function blockUser(email: string, reason: string, by: string): Promise<BlockedUser> {
+  const normalized = email.trim().toLowerCase();
+  if (!normalized || !normalized.includes("@")) throw new HttpError(400, "Enter a valid email address.");
+  if ((await listBlockedUsers()).some((b) => b.email === normalized)) {
+    throw new HttpError(409, "That email is already blocked.");
+  }
+  const row = {
+    "Block ID": genId("BLKU"),
+    Type: "user",
+    Date: "",
+    "Slot ID": "",
+    "Slot Label": "",
+    Email: normalized,
+    Reason: reason || "",
+    "Created At": nowIso(),
+    "Created By": by,
+    Active: "TRUE",
+  };
+  await appendRows(TAB.Blocks, [row]);
+  return {
+    blockId: row["Block ID"],
+    email: normalized,
+    reason: reason || "",
+    createdAt: row["Created At"],
+    createdBy: by,
+  };
 }
 
 async function findRow(blockId: string) {
@@ -101,6 +144,9 @@ export async function unblockSlot(blockId: string): Promise<void> {
   await patchCells(TAB.Blocks, rowNumber, { Active: "FALSE" });
 }
 export async function unblockDate(blockId: string): Promise<void> {
+  await unblockSlot(blockId);
+}
+export async function unblockUser(blockId: string): Promise<void> {
   await unblockSlot(blockId);
 }
 

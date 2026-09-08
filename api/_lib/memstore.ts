@@ -4,7 +4,7 @@
  * local demo. Data lives only for the process lifetime.
  */
 import type { Table } from "./sheets.js";
-import { HEADERS, DEFAULT_QUESTIONS } from "./schema.js";
+import { HEADERS, DEFAULT_QUESTIONS, DEFAULT_CONFIG } from "./schema.js";
 
 type Grid = string[][]; // includes header row at index 0
 
@@ -88,6 +88,10 @@ export function memSeed(): void {
       Active: "TRUE",
       "Created At": new Date().toISOString(),
     }))
+  );
+  memAppendRows(
+    "Config",
+    DEFAULT_CONFIG.map((c) => ({ Key: c.key, Value: c.value, Description: c.description }))
   );
   memAppendRows("TT", [
     { "Employee ID": "E1", Name: "Alice Rahman", Email: "alice@10ms.test", Department: "Tech", Designation: "SWE", "Line Manager Name": "Mgr One", "Line Manager Email": "mgr1@10ms.test" },
