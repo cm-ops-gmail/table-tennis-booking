@@ -58,10 +58,17 @@ function WelcomeHero({ name }: { name: string }) {
   );
 }
 
+/** Pure calendar-date arithmetic, entirely in UTC so the result never
+ *  depends on the visitor's browser timezone. Parsing "YYYY-MM-DDT00:00:00"
+ *  as local time and then re-serializing via toISOString() (UTC) used to
+ *  silently cancel out a +1 day in any timezone ahead of UTC (Asia/Dhaka
+ *  included, where this tool actually runs) — the Next button looked like
+ *  it did nothing. */
 function addDays(ymd: string, n: number): string {
-  const d = new Date(ymd + "T00:00:00");
-  d.setDate(d.getDate() + n);
-  return d.toISOString().slice(0, 10);
+  const [y, m, d] = ymd.split("-").map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + n);
+  return dt.toISOString().slice(0, 10);
 }
 function prettyDate(ymd: string): string {
   return new Date(ymd + "T00:00:00").toLocaleDateString(undefined, {

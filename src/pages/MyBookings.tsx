@@ -17,6 +17,7 @@ function prettyDate(ymd: string) {
 export default function MyBookings() {
   const employee = useEmployee()!;
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [today, setToday] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
@@ -24,10 +25,12 @@ export default function MyBookings() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const { bookings } = await api<{ bookings: Booking[] }>("/bookings", {
-        query: { employeeId: employee.employeeId },
-      });
+      const [{ bookings }, cfg] = await Promise.all([
+        api<{ bookings: Booking[] }>("/bookings", { query: { employeeId: employee.employeeId } }),
+        api<{ today: string }>("/config"),
+      ]);
       setBookings(bookings);
+      setToday(cfg.today);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Failed to load bookings.");
     } finally {
@@ -54,7 +57,6 @@ export default function MyBookings() {
     }
   }
 
-  const today = new Date().toISOString().slice(0, 10);
   const upcoming = bookings.filter((b) => b.status === "Confirmed" && b.date >= today);
   const past = bookings.filter((b) => !(b.status === "Confirmed" && b.date >= today));
 
