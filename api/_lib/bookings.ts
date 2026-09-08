@@ -56,9 +56,56 @@ export async function getBooking(bookingId: string, fresh = false): Promise<{ bo
   return { booking: parseBooking(t.rows[idx]), rowNumber: t.rowNumbers[idx] };
 }
 
-/** Has this slot's start time already come and gone (only meaningful for today)? */
+/** Has this slot's start time already come and gone? True for any date before
+ *  today, or for today once the clock has passed the slot's start time. */
 function hasSlotStarted(date: string, startTime: string): boolean {
-  return date === ymd() && hhmmNow() >= startTime;
+  const today = ymd();
+  return date < today || (date === today && hhmmNow() >= startTime);
+}
+
+/**
+ * Every past, played match still waiting on this person's own feedback.
+ * "Played" mirrors the app's existing "past slot" definition (start time
+ * has come and gone) so this lines up with what the booking grid already
+ * shows as time-passed.
+ */
+async function unratedPastMatches(employeeId: string): Promise<Booking[]> {
+  const id = employeeId.trim().toLowerCase();
+  const all = await listBookings();
+  const played = all.filter(
+    (b) =>
+      b.status === "Confirmed" &&
+      hasSlotStarted(b.date, b.startTime) &&
+      b.participants.some((p) => p.employeeId.toLowerCase() === id)
+  );
+  if (!played.length) return [];
+  const responses = await readTable(TAB.RatingResponses);
+  const rated = new Set(
+    responses.rows
+      .filter((r) => (r["Employee ID"] || "").trim().toLowerCase() === id)
+      .map((r) => r["Booking ID"])
+  );
+  return played.filter((b) => !rated.has(b.bookingId));
+}
+
+/**
+ * Blocks a new booking for anyone in `people` who still owes feedback on a
+ * past match — one open match at a time keeps the rating data honest.
+ */
+async function assertNoOwedFeedback(people: { employeeId: string; name: string }[]): Promise<void> {
+  const owing: string[] = [];
+  for (const p of people) {
+    const pending = await unratedPastMatches(p.employeeId);
+    if (pending.length) owing.push(p.name);
+  }
+  if (owing.length) {
+    const who = owing.join(", ");
+    const verb = owing.length > 1 ? "haven't" : "hasn't";
+    throw new HttpError(
+      409,
+      `${who} ${verb} rated their last match yet. Please give feedback on the previous game before booking another slot.`
+    );
+  }
 }
 
 /** All bookings an employee (by id) is part of, most recent first. */
@@ -122,6 +169,11 @@ export async function createBooking(input: CreateBookingInput): Promise<Booking>
   for (const p of people) {
     if (!p.name || !p.employeeId) throw new HttpError(400, `Missing name or ID for ${p.email || "a participant"}.`);
   }
+
+  // --- outstanding feedback gate ----------------------------------
+  // Nobody on this booking — owner or teammate — may start a new match
+  // while a past one still owes them a rating.
+  await assertNoOwedFeedback(people);
 
   // --- date / slot availability (Rules 1,7,8) --------------------
   if ((await listBlockedDates()).some((b) => b.date === date)) {
@@ -249,4 +301,4 @@ export async function cancelBooking(bookingId: string, requesterId: string): Pro
   return cancelled;
 }
 
-export { SLOTS };
+export { SLOTS, hasSlotStarted };

@@ -2,9 +2,8 @@ import { readTable, appendRows, patchCells } from "./sheets.js";
 import { TAB } from "./schema.js";
 import { genId, nowIso, truthy, splitList, HttpError } from "./util.js";
 import type { QuestionType, RatingQuestion, RatingResponseRow } from "../../src/shared/types.js";
-import { bookingsForEmployee } from "./bookings.js";
+import { bookingsForEmployee, hasSlotStarted } from "./bookings.js";
 import { getConfig } from "./config.js";
-import { ymd } from "./util.js";
 
 const TYPES: QuestionType[] = ["star", "scale", "yesno", "choice", "text"];
 
@@ -105,9 +104,8 @@ export async function ratableBookings(employeeId: string) {
   const ratedByMe = new Set(
     responses.filter((r) => r.employeeId.toLowerCase() === employeeId.toLowerCase()).map((r) => r.bookingId)
   );
-  const today = ymd();
   return mine
-    .filter((b) => b.status === "Confirmed" && b.date <= today)
+    .filter((b) => b.status === "Confirmed" && hasSlotStarted(b.date, b.startTime))
     .map((b) => ({
       bookingId: b.bookingId,
       date: b.date,

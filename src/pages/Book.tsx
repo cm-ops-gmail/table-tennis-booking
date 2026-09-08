@@ -497,7 +497,19 @@ export default function Book() {
                 : `Remove ${totalPlayers - MAX_PLAYERS} player.`}
             </p>
           )}
-          {modalError && <Alert tone="error">{modalError}</Alert>}
+          {modalError && (
+            <Alert tone="error">
+              {modalError}
+              {/rated their last match/i.test(modalError) && (
+                <>
+                  {" "}
+                  <Link to="/rate" className="font-medium underline underline-offset-2">
+                    Go rate it →
+                  </Link>
+                </>
+              )}
+            </Alert>
+          )}
         </div>
       </Dialog>
     </div>

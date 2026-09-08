@@ -218,6 +218,77 @@ async function main() {
       Array.isArray(report.body.respondentsList) && report.body.respondentsList.length >= 1
     );
 
+    console.log("\nfeedback gate before a new booking");
+    // The API itself refuses to create bookings in the past, so seed one
+    // directly — this stands in for a real match that was already played.
+    const { memAppendRows: seedRow } = await import("../api/_lib/memstore");
+    const gateDate = futureDate(6);
+    seedRow("Bookings", [
+      {
+        "Booking ID": "TTB-PAST-GATE",
+        "Created At": new Date().toISOString(),
+        Date: futureDate(-1),
+        "Slot ID": 1,
+        "Slot Label": "1:00 PM - 1:30 PM",
+        "Start Time": "13:00",
+        "End Time": "13:30",
+        Status: "Confirmed",
+        "Owner ID": "E1",
+        "Owner Name": "Alice Rahman",
+        "Owner Email": "alice@10ms.test",
+        "Player Count": 2,
+        "Participant IDs": "E1, E2",
+        "Participant Names": "Alice Rahman, Bob Karim",
+        "Participant Emails": "alice@10ms.test, bob@10ms.test",
+        "Line Manager Emails": "",
+        "Cancelled At": "",
+        "Cancelled By": "",
+        Notes: "",
+      },
+    ]);
+
+    const blockedBoth = await call("/bookings", {
+      body: { ownerId: "E1", participantIds: ["E2"], date: gateDate, slotId: 4 },
+    });
+    ok("cannot book while feedback is owed (409)", blockedBoth.status === 409, JSON.stringify(blockedBoth.body));
+    ok(
+      "feedback-gate message names both owing players",
+      /Alice Rahman/.test(blockedBoth.body.error) && /Bob Karim/.test(blockedBoth.body.error)
+    );
+
+    const gateQuestions = (await call("/ratings/questions")).body.questions;
+    await call("/ratings/submit", {
+      body: {
+        employeeId: "E1",
+        employeeName: "Alice Rahman",
+        bookingId: "TTB-PAST-GATE",
+        answers: [{ questionId: gateQuestions[0].questionId, answer: "5" }],
+      },
+    });
+
+    const blockedOne = await call("/bookings", {
+      body: { ownerId: "E1", participantIds: ["E2"], date: gateDate, slotId: 4 },
+    });
+    ok("still blocked once only one of two players has rated (409)", blockedOne.status === 409);
+    ok(
+      "feedback-gate message now names only the remaining player",
+      /Bob Karim/.test(blockedOne.body.error) && !/Alice Rahman/.test(blockedOne.body.error)
+    );
+
+    await call("/ratings/submit", {
+      body: {
+        employeeId: "E2",
+        employeeName: "Bob Karim",
+        bookingId: "TTB-PAST-GATE",
+        answers: [{ questionId: gateQuestions[0].questionId, answer: "4" }],
+      },
+    });
+
+    const unblocked = await call("/bookings", {
+      body: { ownerId: "E1", participantIds: ["E2"], date: gateDate, slotId: 4 },
+    });
+    ok("booking allowed once everyone has rated their last match", unblocked.status === 201, JSON.stringify(unblocked.body));
+
     console.log(`\n${pass} passed, ${fail} failed\n`);
     process.exitCode = fail === 0 ? 0 : 1;
   } finally {
