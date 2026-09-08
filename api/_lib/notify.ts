@@ -64,26 +64,40 @@ export async function queueBookingNotifications(
     });
   }
 
-  // 11.2 — line manager of each participant
-  const seenMgr = new Set<string>();
+  // 11.2 — line manager of each participant. Grouped by manager email, not
+  // by employee: two participants who share a manager produce ONE email
+  // naming both of them, not two separate emails.
+  const byManager = new Map<
+    string,
+    { name: string; email: string; people: { name: string; employeeId: string }[] }
+  >();
   for (const p of b.participants) {
     const mgr = managers.find((m) => m.employeeId === p.employeeId);
     if (!mgr?.lineManagerEmail) continue;
-    const key = `${mgr.lineManagerEmail}::${p.employeeId}`;
-    if (seenMgr.has(key)) continue;
-    seenMgr.add(key);
+    const key = mgr.lineManagerEmail.toLowerCase();
+    const cur = byManager.get(key) || {
+      name: mgr.lineManagerName || "Line Manager",
+      email: mgr.lineManagerEmail,
+      people: [] as { name: string; employeeId: string }[],
+    };
+    cur.people.push({ name: p.name, employeeId: p.employeeId });
+    byManager.set(key, cur);
+  }
+  for (const mgr of byManager.values()) {
+    const multi = mgr.people.length > 1;
+    const names = mgr.people.map((x) => `${x.name} (${x.employeeId})`).join(", ");
     rows.push({
       ...base,
       "Notification ID": genId("NTF"),
       "Recipient Role": "line_manager",
-      "Recipient Name": mgr.lineManagerName || "Line Manager",
-      "Recipient Email": mgr.lineManagerEmail,
-      Subject: `Team member Table Tennis booking ${verb} — ${p.name}`,
+      "Recipient Name": mgr.name,
+      "Recipient Email": mgr.email,
+      Subject: `Team member${multi ? "s'" : "'s"} Table Tennis booking ${verb} — ${names}`,
       Body:
-        `This is to inform you that a team member's Table Tennis booking has been ${verb}.\n\n` +
-        `Employee: ${p.name}\nEmployee ID: ${p.employeeId}\n` +
+        `This is to inform you that ${multi ? "your team members'" : "a team member's"} Table Tennis booking has been ${verb}.\n\n` +
+        `${multi ? "Employees" : "Employee"}: ${names}\n` +
         `Booking Date: ${b.date}\nMatch Time: ${b.slotLabel}\n` +
-        `Other Participants: ${b.participants.filter((x) => x.employeeId !== p.employeeId).map((x) => x.name).join(", ") || "—"}\n` +
+        `All Players: ${fmtPlayers(b)}\n` +
         `Booking Owner: ${b.ownerName}\nBooking ID: ${b.bookingId}`,
     });
   }

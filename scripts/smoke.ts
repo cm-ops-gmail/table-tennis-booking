@@ -134,6 +134,22 @@ async function main() {
     ok("notifications queued Pending", notif.rows.length > 0 && notif.rows.every((r) => r["Status"] === "Pending"));
     ok("has line_manager + hr_admin + participant rows", new Set(notif.rows.map((r) => r["Recipient Role"])).size >= 2);
 
+    // E1 and E2 (this first booking's players) share the same line manager
+    // (mgr1@10ms.test) — that manager must get exactly one email for THIS
+    // booking naming both of them, not two separate emails.
+    const mgrRows = notif.rows.filter(
+      (r) =>
+        r["Recipient Role"] === "line_manager" &&
+        r["Recipient Email"] === "mgr1@10ms.test" &&
+        r["Booking ID"] === bookingId &&
+        r["Type"] === "booking_created"
+    );
+    ok("shared line manager gets exactly one email", mgrRows.length === 1, JSON.stringify(mgrRows));
+    ok(
+      "that email names both team members",
+      mgrRows[0] && /Alice Rahman/.test(mgrRows[0]["Body"]) && /Bob Karim/.test(mgrRows[0]["Body"])
+    );
+
     console.log("\nadmin: create booking + leaderboard");
     const adminBk = await call("/admin/bookings", {
       admin: true,
