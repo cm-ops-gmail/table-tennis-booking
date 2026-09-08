@@ -206,7 +206,9 @@ export default function Play() {
   useEffect(() => {
     const cvs = canvasRef.current!;
     const ctx = cvs.getContext("2d")!;
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    // The table now renders much larger (up to ~90vw/82vw), so give the
+    // backing store extra headroom on high-density screens to stay crisp.
+    const dpr = Math.min(3, window.devicePixelRatio || 1);
     cvs.width = CW * dpr;
     cvs.height = CH * dpr;
     ctx.scale(dpr, dpr);
@@ -519,97 +521,103 @@ export default function Play() {
   const showOverlay = phase !== "rally";
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h1 className="flex items-center gap-2 text-xl font-semibold">
-          <span>🏓</span> Table Tennis · vs Computer
-        </h1>
-        <Link
-          to="/"
-          className="rounded-md border border-input px-3 py-1.5 text-sm font-medium no-underline transition-colors hover:bg-accent"
-        >
-          ← Back to booking
-        </Link>
-      </div>
+    // Break out of the shell's max-w-6xl / px-4 so the table can genuinely
+    // fill ~90% of the viewport on phones and ~80% on desktop, per request —
+    // a game screen benefits from using the whole window, unlike the reading
+    // -width pages around it.
+    <div className="relative left-1/2 w-screen -translate-x-1/2 px-1.5 sm:px-6">
+      <div className="mx-auto flex w-[97vw] max-w-[1400px] flex-col gap-4 sm:w-[82vw]">
+        <div className="flex items-center justify-between">
+          <h1 className="flex items-center gap-2 text-xl font-semibold">
+            <span>🏓</span> Table Tennis · vs Computer
+          </h1>
+          <Link
+            to="/"
+            className="rounded-md border border-input px-3 py-1.5 text-sm font-medium no-underline transition-colors hover:bg-accent"
+          >
+            ← Back to booking
+          </Link>
+        </div>
 
-      <Card>
-        <CardContent className="flex flex-col items-center gap-4 pt-5">
-          <div className="flex w-full items-center justify-between text-sm">
-            <div className="flex items-center gap-2">
-              <span className="h-3 w-3 rounded-sm bg-[color:var(--success)]" />
-              <span className="font-medium">You</span>
-              <span className="text-2xl font-bold tabular-nums">{score.you}</span>
-            </div>
-            <span className="text-xs text-muted-foreground">first to 11 · win by 2</span>
-            <div className="flex items-center gap-2">
-              <span className="text-2xl font-bold tabular-nums">{score.cpu}</span>
-              <span className="font-medium">CPU</span>
-              <span className="h-3 w-3 rounded-sm bg-[color:var(--info)]" />
-            </div>
-          </div>
-
-          <div className="relative w-full">
-            <canvas
-              ref={canvasRef}
-              width={CW}
-              height={CH}
-              className="w-full touch-none rounded-xl border border-border"
-              style={{ aspectRatio: `${CW} / ${CH}`, cursor: phase === "rally" ? "none" : "default" }}
-            />
-            {showOverlay && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-xl bg-background/70 backdrop-blur-sm">
-                {phase === "over" ? (
-                  <div className="tt-pop text-center">
-                    <div className="text-5xl">{winner === "you" ? "🏆" : "🤖"}</div>
-                    <div className="mt-1 text-lg font-semibold">
-                      {winner === "you" ? "Game — you win!" : "Game — CPU wins"}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      {score.you}–{score.cpu}
-                    </div>
-                  </div>
-                ) : phase === "idle" ? (
-                  <div className="max-w-xs text-center">
-                    <div className="text-3xl">🏓</div>
-                    <div className="mt-1 text-sm text-muted-foreground">
-                      Move the mouse (or drag your finger) to slide your paddle left–right and
-                      lift it up–down. Let the ball bounce on your half, then swing it back over
-                      the net.
-                    </div>
-                  </div>
-                ) : (
-                  <div className="tt-pop text-base font-semibold">{msg || "…"}</div>
-                )}
-                {(phase === "idle" || phase === "over") && (
-                  <Button size="lg" onClick={startMatch}>
-                    {phase === "over" ? "Play again" : "Start game"} 🏓
-                  </Button>
-                )}
+        <Card>
+          <CardContent className="flex flex-col items-center gap-4 px-3 pt-5 sm:px-5">
+            <div className="flex w-full items-center justify-between text-sm">
+              <div className="flex items-center gap-2">
+                <span className="h-3 w-3 rounded-sm bg-[color:var(--success)]" />
+                <span className="font-medium">You</span>
+                <span className="text-2xl font-bold tabular-nums">{score.you}</span>
               </div>
-            )}
-          </div>
+              <span className="text-xs text-muted-foreground">first to 11 · win by 2</span>
+              <div className="flex items-center gap-2">
+                <span className="text-2xl font-bold tabular-nums">{score.cpu}</span>
+                <span className="font-medium">CPU</span>
+                <span className="h-3 w-3 rounded-sm bg-[color:var(--info)]" />
+              </div>
+            </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">Difficulty</span>
-            {(["easy", "normal", "hard"] as Diff[]).map((d) => (
-              <button
-                key={d}
-                onClick={() => setDiff(d)}
-                className={cx(
-                  "tt-press rounded-md border px-3 py-1 text-xs font-medium capitalize transition-colors",
-                  diff === d ? "border-primary bg-primary text-primary-foreground" : "border-input hover:bg-accent"
-                )}
-              >
-                {d}
-              </button>
-            ))}
-          </div>
+            <div className="relative w-full">
+              <canvas
+                ref={canvasRef}
+                width={CW}
+                height={CH}
+                className="w-full touch-none rounded-xl border border-border"
+                style={{ aspectRatio: `${CW} / ${CH}`, cursor: phase === "rally" ? "none" : "default" }}
+              />
+              {showOverlay && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-xl bg-background/70 backdrop-blur-sm">
+                  {phase === "over" ? (
+                    <div className="tt-pop text-center">
+                      <div className="text-5xl">{winner === "you" ? "🏆" : "🤖"}</div>
+                      <div className="mt-1 text-lg font-semibold">
+                        {winner === "you" ? "Game — you win!" : "Game — CPU wins"}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {score.you}–{score.cpu}
+                      </div>
+                    </div>
+                  ) : phase === "idle" ? (
+                    <div className="max-w-xs text-center">
+                      <div className="text-3xl">🏓</div>
+                      <div className="mt-1 text-sm text-muted-foreground">
+                        Move the mouse (or drag your finger) to slide your paddle left–right and
+                        lift it up–down. Let the ball bounce on your half, then swing it back over
+                        the net.
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="tt-pop text-base font-semibold">{msg || "…"}</div>
+                  )}
+                  {(phase === "idle" || phase === "over") && (
+                    <Button size="lg" onClick={startMatch}>
+                      {phase === "over" ? "Play again" : "Start game"} 🏓
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
 
-          <p className="text-center text-xs text-muted-foreground">
-            Just for fun while a real table frees up — nothing is saved.
-          </p>
-        </CardContent>
-      </Card>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Difficulty</span>
+              {(["easy", "normal", "hard"] as Diff[]).map((d) => (
+                <button
+                  key={d}
+                  onClick={() => setDiff(d)}
+                  className={cx(
+                    "tt-press rounded-md border px-3 py-1 text-xs font-medium capitalize transition-colors",
+                    diff === d ? "border-primary bg-primary text-primary-foreground" : "border-input hover:bg-accent"
+                  )}
+                >
+                  {d}
+                </button>
+              ))}
+            </div>
+
+            <p className="text-center text-xs text-muted-foreground">
+              Just for fun while a real table frees up — nothing is saved.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
