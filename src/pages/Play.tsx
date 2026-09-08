@@ -572,8 +572,9 @@ export default function Play() {
                   <div className="max-w-xs text-center">
                     <div className="text-3xl">🏓</div>
                     <div className="mt-1 text-sm text-muted-foreground">
-                      Move the mouse to slide your paddle (left–right) and lift it (up–down).
-                      Let the ball bounce on your half, then swing it back over the net.
+                      Move the mouse (or drag your finger) to slide your paddle left–right and
+                      lift it up–down. Let the ball bounce on your half, then swing it back over
+                      the net.
                     </div>
                   </div>
                 ) : (

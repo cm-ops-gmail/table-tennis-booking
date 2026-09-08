@@ -426,42 +426,72 @@ function PlayersAdmin() {
         {rows.length === 0 ? (
           <EmptyState title={q ? "No player matches that search" : "No matches played yet"} />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-left text-xs text-muted-foreground">
-                <tr>
-                  <th className="py-1.5 pr-3 w-10">#</th>
-                  <th className="py-1.5 pr-4">Player</th>
-                  <th className="py-1.5 pr-4">Team</th>
-                  <th className="py-1.5 pr-4 text-right">Matches</th>
-                  <th className="py-1.5 pr-4 text-right">As owner</th>
-                  <th className="py-1.5 pr-4 text-right">Cancelled</th>
-                  <th className="py-1.5 pr-4">Last played</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((p) => {
-                  const rank = data.participation.indexOf(p) + 1;
-                  return (
-                    <tr key={p.employeeId} className="border-t border-border">
-                      <td className="py-1.5 pr-3 tabular-nums">{MEDAL[rank - 1] || rank}</td>
-                      <td className="py-1.5 pr-4">
-                        <span className="font-medium">{p.name}</span>{" "}
-                        <span className="text-xs text-muted-foreground">· {p.employeeId}</span>
-                      </td>
-                      <td className="py-1.5 pr-4">{p.department || "—"}</td>
-                      <td className="py-1.5 pr-4 text-right font-semibold tabular-nums">{p.total}</td>
-                      <td className="py-1.5 pr-4 text-right tabular-nums">{p.owned}</td>
-                      <td className="py-1.5 pr-4 text-right tabular-nums">{p.cancelled}</td>
-                      <td className="py-1.5 pr-4 whitespace-nowrap">
-                        {p.lastPlayed ? prettyDate(p.lastPlayed) : "—"}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <>
+            {/* Mobile: one card per player. Desktop: a real table. */}
+            <div className="flex flex-col gap-2 sm:hidden">
+              {rows.map((p) => {
+                const rank = data.participation.indexOf(p) + 1;
+                return (
+                  <div key={p.employeeId} className="rounded-lg border border-border p-3 text-sm">
+                    <div className="flex items-center gap-2">
+                      <span className="w-6 shrink-0 text-center">{MEDAL[rank - 1] || rank}</span>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-medium">{p.name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {p.employeeId} · {p.department || "—"}
+                        </div>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <div className="font-semibold tabular-nums">{p.total}</div>
+                        <div className="text-[10px] uppercase text-muted-foreground">matches</div>
+                      </div>
+                    </div>
+                    <div className="mt-2 flex justify-between text-xs text-muted-foreground">
+                      <span>As owner: {p.owned}</span>
+                      <span>Cancelled: {p.cancelled}</span>
+                      <span>{p.lastPlayed ? prettyDate(p.lastPlayed) : "—"}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="hidden overflow-x-auto sm:block">
+              <table className="w-full text-sm">
+                <thead className="text-left text-xs text-muted-foreground">
+                  <tr>
+                    <th className="py-1.5 pr-3 w-10">#</th>
+                    <th className="py-1.5 pr-4">Player</th>
+                    <th className="py-1.5 pr-4">Team</th>
+                    <th className="py-1.5 pr-4 text-right">Matches</th>
+                    <th className="py-1.5 pr-4 text-right">As owner</th>
+                    <th className="py-1.5 pr-4 text-right">Cancelled</th>
+                    <th className="py-1.5 pr-4">Last played</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((p) => {
+                    const rank = data.participation.indexOf(p) + 1;
+                    return (
+                      <tr key={p.employeeId} className="border-t border-border">
+                        <td className="py-1.5 pr-3 tabular-nums">{MEDAL[rank - 1] || rank}</td>
+                        <td className="py-1.5 pr-4">
+                          <span className="font-medium">{p.name}</span>{" "}
+                          <span className="text-xs text-muted-foreground">· {p.employeeId}</span>
+                        </td>
+                        <td className="py-1.5 pr-4">{p.department || "—"}</td>
+                        <td className="py-1.5 pr-4 text-right font-semibold tabular-nums">{p.total}</td>
+                        <td className="py-1.5 pr-4 text-right tabular-nums">{p.owned}</td>
+                        <td className="py-1.5 pr-4 text-right tabular-nums">{p.cancelled}</td>
+                        <td className="py-1.5 pr-4 whitespace-nowrap">
+                          {p.lastPlayed ? prettyDate(p.lastPlayed) : "—"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
 
         {!q && total > 20 && (
@@ -480,32 +510,52 @@ function PlayersAdmin() {
 function BookingTable({ rows }: { rows: Booking[] }) {
   if (rows.length === 0) return <EmptyState title="No bookings" />;
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead className="text-left text-xs text-muted-foreground">
-          <tr>
-            <th className="py-1.5 pr-4">Date</th>
-            <th className="py-1.5 pr-4">Slot</th>
-            <th className="py-1.5 pr-4">Owner</th>
-            <th className="py-1.5 pr-4">Players</th>
-            <th className="py-1.5 pr-4">Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((b) => (
-            <tr key={b.bookingId} className="border-t border-border align-top">
-              <td className="py-1.5 pr-4 whitespace-nowrap">{prettyDate(b.date)}</td>
-              <td className="py-1.5 pr-4 whitespace-nowrap">{b.slotLabel}</td>
-              <td className="py-1.5 pr-4 whitespace-nowrap">{b.ownerName}</td>
-              <td className="py-1.5 pr-4">{b.participants.map((p) => p.name).join(", ")}</td>
-              <td className="py-1.5 pr-4">
-                <Badge tone={b.status === "Cancelled" ? "destructive" : "success"}>{b.status}</Badge>
-              </td>
+    <>
+      {/* Mobile: one card per booking. Desktop: a real table. */}
+      <div className="flex flex-col gap-2 sm:hidden">
+        {rows.map((b) => (
+          <div key={b.bookingId} className="rounded-lg border border-border p-3 text-sm">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <div className="font-medium">{prettyDate(b.date)}</div>
+                <div className="text-xs text-muted-foreground">{b.slotLabel}</div>
+              </div>
+              <Badge tone={b.status === "Cancelled" ? "destructive" : "success"}>{b.status}</Badge>
+            </div>
+            <div className="mt-2 text-xs text-muted-foreground">Owner: {b.ownerName}</div>
+            <div className="text-xs text-muted-foreground">
+              Players: {b.participants.map((p) => p.name).join(", ")}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="hidden overflow-x-auto sm:block">
+        <table className="w-full text-sm">
+          <thead className="text-left text-xs text-muted-foreground">
+            <tr>
+              <th className="py-1.5 pr-4">Date</th>
+              <th className="py-1.5 pr-4">Slot</th>
+              <th className="py-1.5 pr-4">Owner</th>
+              <th className="py-1.5 pr-4">Players</th>
+              <th className="py-1.5 pr-4">Status</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {rows.map((b) => (
+              <tr key={b.bookingId} className="border-t border-border align-top">
+                <td className="py-1.5 pr-4 whitespace-nowrap">{prettyDate(b.date)}</td>
+                <td className="py-1.5 pr-4 whitespace-nowrap">{b.slotLabel}</td>
+                <td className="py-1.5 pr-4 whitespace-nowrap">{b.ownerName}</td>
+                <td className="py-1.5 pr-4">{b.participants.map((p) => p.name).join(", ")}</td>
+                <td className="py-1.5 pr-4">
+                  <Badge tone={b.status === "Cancelled" ? "destructive" : "success"}>{b.status}</Badge>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }
 
@@ -668,7 +718,7 @@ function AdminBookingDialog({ onClose, onCreated }: { onClose: () => void; onCre
           </Select>
         </Field>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Date">
             <Input type="date" min={today} value={date} onChange={(e) => setDate(e.target.value)} />
           </Field>
@@ -1010,40 +1060,44 @@ function QuestionsAdmin() {
         <div className="flex flex-col gap-2">
           {data.questions.map((q) => (
             <Card key={q.questionId}>
-              <CardContent className="flex flex-wrap items-center gap-3 pt-5">
-                <span className="text-xs text-muted-foreground">#{q.order}</span>
-                <div className="flex-1">
-                  <div className="text-sm font-medium">{q.text}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {Q_TYPES.find((t) => t.value === q.type)?.label}
-                    {q.type === "choice" && q.options.length ? ` · ${q.options.join(", ")}` : ""}
+              <CardContent className="flex flex-col gap-3 pt-5 sm:flex-row sm:items-center">
+                <div className="flex items-start gap-2 sm:flex-1 sm:items-center">
+                  <span className="shrink-0 text-xs text-muted-foreground">#{q.order}</span>
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium">{q.text}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {Q_TYPES.find((t) => t.value === q.type)?.label}
+                      {q.type === "choice" && q.options.length ? ` · ${q.options.join(", ")}` : ""}
+                    </div>
                   </div>
                 </div>
-                <Badge tone={q.active ? "success" : "muted"}>{q.active ? "Active" : "Inactive"}</Badge>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={async () => {
-                    await api(`/admin/questions/${q.questionId}`, { admin: true, method: "PUT", body: { active: !q.active } });
-                    reload();
-                  }}
-                >
-                  {q.active ? "Deactivate" : "Activate"}
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => setModal(q)}>
-                  Edit
-                </Button>
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  onClick={async () => {
-                    if (!confirm("Delete this question? Existing responses are kept.")) return;
-                    await api(`/admin/questions/${q.questionId}`, { admin: true, method: "DELETE" });
-                    reload();
-                  }}
-                >
-                  Delete
-                </Button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge tone={q.active ? "success" : "muted"}>{q.active ? "Active" : "Inactive"}</Badge>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={async () => {
+                      await api(`/admin/questions/${q.questionId}`, { admin: true, method: "PUT", body: { active: !q.active } });
+                      reload();
+                    }}
+                  >
+                    {q.active ? "Deactivate" : "Activate"}
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setModal(q)}>
+                    Edit
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={async () => {
+                      if (!confirm("Delete this question? Existing responses are kept.")) return;
+                      await api(`/admin/questions/${q.questionId}`, { admin: true, method: "DELETE" });
+                      reload();
+                    }}
+                  >
+                    Delete
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           ))}
@@ -1124,7 +1178,7 @@ function QuestionDialog({
         <Field label="Question text">
           <Textarea value={text} onChange={(e) => setText(e.target.value)} />
         </Field>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field label="Type">
             <Select value={type} onChange={(e) => setType(e.target.value as RatingQuestion["type"])}>
               {Q_TYPES.map((t) => (
@@ -1238,33 +1292,50 @@ function RatingReports() {
           {respondents.length === 0 ? (
             <EmptyState title="No feedback yet" />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="text-left text-xs text-muted-foreground">
-                  <tr>
-                    <th className="py-1.5 pr-4">Employee</th>
-                    <th className="py-1.5 pr-4 text-right">Answers</th>
-                    <th className="py-1.5 pr-4 text-right">Matches rated</th>
-                    <th className="py-1.5 pr-4">Last submitted</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {respondents.map((r) => (
-                    <tr key={r.employeeId} className="border-t border-border">
-                      <td className="py-1.5 pr-4">
-                        <span className="font-medium">{r.name}</span>{" "}
-                        <span className="text-xs text-muted-foreground">· {r.employeeId}</span>
-                      </td>
-                      <td className="py-1.5 pr-4 text-right tabular-nums">{r.answers}</td>
-                      <td className="py-1.5 pr-4 text-right tabular-nums">{r.matchesRated}</td>
-                      <td className="py-1.5 pr-4 whitespace-nowrap">
-                        {r.lastAt ? new Date(r.lastAt).toLocaleString() : "—"}
-                      </td>
+            <>
+              <div className="flex flex-col gap-2 sm:hidden">
+                {respondents.map((r) => (
+                  <div key={r.employeeId} className="rounded-lg border border-border p-3 text-sm">
+                    <div className="font-medium">{r.name}</div>
+                    <div className="text-xs text-muted-foreground">{r.employeeId}</div>
+                    <div className="mt-2 flex justify-between text-xs text-muted-foreground">
+                      <span>{r.answers} answers</span>
+                      <span>{r.matchesRated} matches rated</span>
+                    </div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      Last: {r.lastAt ? new Date(r.lastAt).toLocaleString() : "—"}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="hidden overflow-x-auto sm:block">
+                <table className="w-full text-sm">
+                  <thead className="text-left text-xs text-muted-foreground">
+                    <tr>
+                      <th className="py-1.5 pr-4">Employee</th>
+                      <th className="py-1.5 pr-4 text-right">Answers</th>
+                      <th className="py-1.5 pr-4 text-right">Matches rated</th>
+                      <th className="py-1.5 pr-4">Last submitted</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {respondents.map((r) => (
+                      <tr key={r.employeeId} className="border-t border-border">
+                        <td className="py-1.5 pr-4">
+                          <span className="font-medium">{r.name}</span>{" "}
+                          <span className="text-xs text-muted-foreground">· {r.employeeId}</span>
+                        </td>
+                        <td className="py-1.5 pr-4 text-right tabular-nums">{r.answers}</td>
+                        <td className="py-1.5 pr-4 text-right tabular-nums">{r.matchesRated}</td>
+                        <td className="py-1.5 pr-4 whitespace-nowrap">
+                          {r.lastAt ? new Date(r.lastAt).toLocaleString() : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
@@ -1314,30 +1385,46 @@ function RatingReports() {
           {feedback.length === 0 ? (
             <EmptyState title="No feedback yet" />
           ) : (
-            <div className="max-h-[32rem] overflow-auto">
-              <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-card text-left text-xs text-muted-foreground">
-                  <tr>
-                    <th className="py-1.5 pr-4">When</th>
-                    <th className="py-1.5 pr-4">Employee</th>
-                    <th className="py-1.5 pr-4">Question</th>
-                    <th className="py-1.5 pr-4">Answer</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {feedback.slice(0, 300).map((r) => (
-                    <tr key={r.responseId} className="border-t border-border align-top">
-                      <td className="py-1.5 pr-4 whitespace-nowrap">
-                        {new Date(r.submittedAt).toLocaleString()}
-                      </td>
-                      <td className="py-1.5 pr-4 whitespace-nowrap">{r.employeeName}</td>
-                      <td className="py-1.5 pr-4">{r.questionText}</td>
-                      <td className="py-1.5 pr-4">{r.answer}</td>
+            <>
+              <div className="flex max-h-[32rem] flex-col gap-2 overflow-auto sm:hidden">
+                {feedback.slice(0, 300).map((r) => (
+                  <div key={r.responseId} className="rounded-lg border border-border p-3 text-sm">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-medium">{r.employeeName}</span>
+                      <span className="shrink-0 text-xs text-muted-foreground">
+                        {new Date(r.submittedAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <div className="mt-1 text-xs text-muted-foreground">{r.questionText}</div>
+                    <div className="mt-1">{r.answer}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="hidden max-h-[32rem] overflow-auto sm:block">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-card text-left text-xs text-muted-foreground">
+                    <tr>
+                      <th className="py-1.5 pr-4">When</th>
+                      <th className="py-1.5 pr-4">Employee</th>
+                      <th className="py-1.5 pr-4">Question</th>
+                      <th className="py-1.5 pr-4">Answer</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {feedback.slice(0, 300).map((r) => (
+                      <tr key={r.responseId} className="border-t border-border align-top">
+                        <td className="py-1.5 pr-4 whitespace-nowrap">
+                          {new Date(r.submittedAt).toLocaleString()}
+                        </td>
+                        <td className="py-1.5 pr-4 whitespace-nowrap">{r.employeeName}</td>
+                        <td className="py-1.5 pr-4">{r.questionText}</td>
+                        <td className="py-1.5 pr-4">{r.answer}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
