@@ -32,11 +32,17 @@ export interface AppConfig {
 }
 
 async function sheetValues(): Promise<Map<string, string>> {
-  const t = await readTable(TAB.Config);
   const map = new Map<string, string>();
-  for (const r of t.rows) {
-    const key = (r["Key"] || "").trim();
-    if (key) map.set(key, (r["Value"] || "").trim());
+  try {
+    const t = await readTable(TAB.Config);
+    for (const r of t.rows) {
+      const key = (r["Key"] || "").trim();
+      if (key) map.set(key, (r["Value"] || "").trim());
+    }
+  } catch {
+    // The Config tab doesn't exist yet (not provisioned) — behave exactly
+    // like an empty tab so every setting falls back to its env var / default
+    // instead of taking the whole app down.
   }
   return map;
 }
