@@ -7,6 +7,21 @@
  * It also independently watches the `Bookings` tab and sends a "please rate
  * this match" reminder once each slot's end time has passed.
  *
+ * TWO TRIGGERS, EACH DOING A DIFFERENT JOB
+ *   - An "on change" trigger fires within seconds of a new row landing in
+ *     the sheet (a booking being made or cancelled) — this is what makes
+ *     confirmation/cancellation emails go out almost instantly instead of
+ *     waiting for the next poll.
+ *   - A time-driven trigger (every 10 minutes) is kept as a safety net —
+ *     it's the ONLY thing that can catch the feedback reminder job, since
+ *     nothing "changes" in the sheet at the moment a slot's end time
+ *     passes; the clock has to be checked on its own schedule. It also
+ *     re-catches anything an on-change event might have missed.
+ *   Both triggers call the exact same function, `runTableTennisMailer` —
+ *   it just re-scans for rows whose marker column (Status /
+ *   "Feedback Reminder Sent") is still blank/Pending and sends those. That
+ *   makes it safe to run redundantly from either trigger, or manually.
+ *
  * SETUP (one time)
  *   1. Open the spreadsheet → Extensions → Apps Script.
  *   2. Delete the default empty `Code.gs` content and paste this whole file
@@ -16,12 +31,11 @@
  *      trailing slash (e.g. https://table-tennis.10minuteschool.com) — this
  *      is used to build the "Submit feedback" / "View my bookings" links.
  *      Leave it blank and those emails just skip the button.
- *   4. In the Apps Script editor, select the `setupTableTennisMailerTrigger`
- *      function from the function dropdown at the top and click ▶ Run.
- *      The first run will ask you to authorize the script (it needs to send
- *      email and read/write this spreadsheet) — approve it. This installs a
- *      time-driven trigger that fires `runTableTennisMailer` every 10
- *      minutes from then on; you don't need to run anything manually again.
+ *   4. In the Apps Script editor, select `setupTableTennisMailer` from the
+ *      function dropdown at the top and click ▶ Run. The first run will ask
+ *      you to authorize the script (it needs to send email and read/write
+ *      this spreadsheet) — approve it. This installs both triggers above;
+ *      you don't need to run anything manually again.
  *   5. Optional: run `sendTestEmailToMyself` once to confirm mail delivery
  *      works before relying on it for real bookings.
  *
@@ -55,19 +69,40 @@ const TT_BRAND = "10 Minute School — Table Tennis";
  * Entry point + trigger setup
  * ------------------------------------------------------------------ */
 
-/** The function the time-driven trigger calls. Safe to run manually too. */
+/** What both triggers call. Re-scans for anything still unsent and sends
+ *  it — safe to run redundantly, manually, or from either trigger type. */
 function runTableTennisMailer() {
   sendPendingNotifications_();
   sendFeedbackReminders_();
 }
 
-/** Run this once from the editor to install the recurring trigger. */
-function setupTableTennisMailerTrigger() {
+/** Run this once from the editor — installs both triggers described above. */
+function setupTableTennisMailer() {
+  setupTableTennisMailerChangeTrigger();
+  setupTableTennisMailerTimeTrigger();
+}
+
+/** Instant-ish reaction to a new/edited row (new booking, cancellation, ...). */
+function setupTableTennisMailerChangeTrigger() {
   ScriptApp.getProjectTriggers().forEach((t) => {
-    if (t.getHandlerFunction() === TT_TRIGGER_FN) ScriptApp.deleteTrigger(t);
+    if (t.getHandlerFunction() === TT_TRIGGER_FN && t.getEventType() === ScriptApp.EventType.ON_CHANGE) {
+      ScriptApp.deleteTrigger(t);
+    }
+  });
+  ScriptApp.newTrigger(TT_TRIGGER_FN).forSpreadsheet(SpreadsheetApp.getActive()).onChange().create();
+  Logger.log("Installed: " + TT_TRIGGER_FN + " will now also run whenever the sheet changes.");
+}
+
+/** Safety net: catches the clock-driven feedback reminder job, and anything
+ *  an on-change event might have missed. */
+function setupTableTennisMailerTimeTrigger() {
+  ScriptApp.getProjectTriggers().forEach((t) => {
+    if (t.getHandlerFunction() === TT_TRIGGER_FN && t.getEventType() === ScriptApp.EventType.CLOCK) {
+      ScriptApp.deleteTrigger(t);
+    }
   });
   ScriptApp.newTrigger(TT_TRIGGER_FN).timeBased().everyMinutes(10).create();
-  Logger.log("Installed: " + TT_TRIGGER_FN + " will run every 10 minutes.");
+  Logger.log("Installed: " + TT_TRIGGER_FN + " will also run every 10 minutes regardless.");
 }
 
 /** Optional: confirm mail delivery works before trusting it for real bookings. */

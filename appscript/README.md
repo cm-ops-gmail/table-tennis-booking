@@ -27,11 +27,18 @@ so this script watches the `Bookings` tab directly and marks each row's
    site URL (no trailing slash) — this builds the "Submit feedback" /
    "View my bookings" buttons in the emails. Leave it blank and those emails
    just skip the button.
-4. Back in the Apps Script editor, pick `setupTableTennisMailerTrigger` from
-   the function dropdown at the top and click **Run**. Approve the
-   authorization prompt (it needs permission to send email and read/write
-   the spreadsheet) — that's it, no need to run anything again. A trigger now
-   fires `runTableTennisMailer` every 10 minutes.
+4. Back in the Apps Script editor, pick `setupTableTennisMailer` from the
+   function dropdown at the top and click **Run**. Approve the authorization
+   prompt (it needs permission to send email and read/write the spreadsheet)
+   — that's it, no need to run anything again. This installs **two**
+   triggers, both calling `runTableTennisMailer`:
+   - an **on-change** trigger, which fires within seconds of a new booking
+     or cancellation row landing in the sheet — this is what gets
+     confirmation emails out almost instantly instead of waiting on a poll;
+   - a **10-minute** trigger, kept as the only way to catch the feedback
+     reminder job (nothing "changes" in the sheet the instant a slot's end
+     time passes — the clock has to be checked on its own schedule) and as
+     a safety net for anything an on-change event might have missed.
 5. Optional but recommended: run `sendTestEmailToMyself` once to confirm
    delivery works before relying on it for real bookings.
 
