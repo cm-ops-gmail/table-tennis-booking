@@ -35,10 +35,15 @@ so this script watches the `Bookings` tab directly and marks each row's
    - an **on-change** trigger, which fires within seconds of a new booking
      or cancellation row landing in the sheet — this is what gets
      confirmation emails out almost instantly instead of waiting on a poll;
-   - a **10-minute** trigger, kept as the only way to catch the feedback
+   - a **30-minute** trigger, kept as the only way to catch the feedback
      reminder job (nothing "changes" in the sheet the instant a slot's end
      time passes — the clock has to be checked on its own schedule) and as
-     a safety net for anything an on-change event might have missed.
+     a safety net for anything an on-change event might have missed. Apps
+     Script can't restrict a recurring trigger to specific hours, so it
+     still wakes up all day, but the reminder scan itself exits immediately
+     outside `TT_FEEDBACK_WINDOW_START`/`END` (1 PM–6 PM by default —
+     edit those two constants in the script if your facility hours differ),
+     so nothing actually happens on those overnight wake-ups.
 5. Optional but recommended: run `sendTestEmailToMyself` once to confirm
    delivery works before relying on it for real bookings.
 
