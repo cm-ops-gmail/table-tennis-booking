@@ -458,7 +458,7 @@ export default function Book() {
       >
         <div className="flex flex-col gap-4">
           <div className="flex items-center gap-2 rounded-lg border border-border bg-secondary/50 px-3 py-2 text-sm">
-            <span className="tt-brand-gradient grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-semibold text-primary-foreground">
+            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
               {employee.name.split(" ").map((w) => w[0]).slice(0, 2).join("")}
             </span>
             <span>

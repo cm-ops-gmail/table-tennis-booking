@@ -103,7 +103,7 @@ function Shell({ children }: { children: React.ReactNode }) {
                     {employee.department || employee.employeeId}
                   </div>
                 </div>
-                <span className="tt-brand-gradient hidden h-8 w-8 place-items-center rounded-full text-xs font-semibold text-primary-foreground sm:grid">
+                <span className="hidden h-8 w-8 place-items-center rounded-full bg-primary text-xs font-semibold text-primary-foreground sm:grid">
                   {employee.name.split(" ").map((w) => w[0]).slice(0, 2).join("")}
                 </span>
                 <Button
