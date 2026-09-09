@@ -32,17 +32,17 @@
  *   2. Delete the default empty `Code.gs` content and paste this whole file
  *      in (or add it as a new script file — the function names just need to
  *      exist somewhere in the project).
- *   3. Fill in the `Config` tab's `APP_URL` row with your live site URL, no
- *      trailing slash (e.g. https://table-tennis.10minuteschool.com) — this
- *      is used to build the "Submit feedback" / "View my bookings" links.
- *      Leave it blank and those emails just skip the button.
- *   4. In the Apps Script editor, select `setupTableTennisMailer` from the
+ *   3. In the Apps Script editor, select `setupTableTennisMailer` from the
  *      function dropdown at the top and click ▶ Run. The first run will ask
  *      you to authorize the script (it needs to send email and read/write
  *      this spreadsheet) — approve it. This installs both triggers above;
  *      you don't need to run anything manually again.
- *   5. Optional: run `sendTestEmailToMyself` once to confirm mail delivery
+ *   4. Optional: run `sendTestEmailToMyself` once to confirm mail delivery
  *      works before relying on it for real bookings.
+ *
+ * The live site URL used for the "Submit feedback" / "View my bookings"
+ * links is the hardcoded TT_APP_URL constant below — edit that one line if
+ * the domain ever changes.
  *
  * WHAT IT SENDS
  *   - Booking confirmed / cancelled → every participant, each participant's
@@ -65,10 +65,12 @@
 
 const TT_TAB_NOTIFICATIONS = "Notifications";
 const TT_TAB_BOOKINGS = "Bookings";
-const TT_TAB_CONFIG = "Config";
 const TT_TIMEZONE = "Asia/Dhaka";
 const TT_TRIGGER_FN = "runTableTennisMailer";
 const TT_BRAND = "10 Minute School — Table Tennis";
+// The live site — used to build the "Submit feedback" / "View my bookings"
+// links in emails. Edit this one line if the domain ever changes.
+const TT_APP_URL = "https://tenms-table-tennis-booking.vercel.app";
 // The feedback-reminder scan only matters while slots can be running — no
 // booking ends outside this window, so there's nothing to check overnight.
 // Edit these two if the facility's hours ever change (currently 1:00 PM –
@@ -191,7 +193,6 @@ function sendFeedbackReminders_() {
   }
 
   const today = Utilities.formatDate(new Date(), TT_TIMEZONE, "yyyy-MM-dd");
-  const appUrl = getConfigValue_(TT_TAB_CONFIG, "APP_URL", "");
 
   let remindedMatches = 0;
   for (const row of rows) {
@@ -213,7 +214,7 @@ function sendFeedbackReminders_() {
         MailApp.sendEmail({
           to: emails[i],
           subject: "How was your Table Tennis match? Feedback needed — " + row["Slot Label"],
-          htmlBody: renderFeedbackReminderEmail_(names[i] || "there", row, appUrl),
+          htmlBody: renderFeedbackReminderEmail_(names[i] || "there", row),
           name: TT_BRAND,
         });
       } catch (err) {
@@ -250,17 +251,6 @@ function readSheetObjects_(tabName) {
     rows.push(obj);
   }
   return { sheet, headers, rows };
-}
-
-function getConfigValue_(tabName, key, fallback) {
-  const { rows } = readSheetObjects_(tabName);
-  for (const r of rows) {
-    if (String(r["Key"] || "").trim() === key) {
-      const v = String(r["Value"] || "").trim();
-      return v || fallback;
-    }
-  }
-  return fallback;
 }
 
 function splitList_(s) {
@@ -371,20 +361,18 @@ function renderNotificationEmail_(row) {
   const type = String(row["Type"] || "");
   const isCancel = type === "booking_cancelled";
   const badge = isCancel ? badge_("Cancelled", "danger") : badge_("Confirmed", "success");
-  const appUrl = getConfigValue_(TT_TAB_CONFIG, "APP_URL", "");
   const greet =
     '<p style="margin:0 0 4px;font-size:14px;color:#333;">Hi ' +
     escapeHtml_(row["Recipient Name"] || "there") +
     ",</p>";
   const cta =
-    !isCancel && appUrl && row["Recipient Role"] === "participant"
-      ? ctaButton_(appUrl + "/my-bookings", "View my bookings")
+    !isCancel && row["Recipient Role"] === "participant"
+      ? ctaButton_(TT_APP_URL + "/my-bookings", "View my bookings")
       : "";
   return emailShell_(String(row["Subject"] || "Table Tennis Booking"), badge + "<br>" + greet + bodyToHtml_(row["Body"]) + cta);
 }
 
-function renderFeedbackReminderEmail_(name, bookingRow, appUrl) {
-  const rateUrl = appUrl ? appUrl + "/rate" : "";
+function renderFeedbackReminderEmail_(name, bookingRow) {
   const body =
     '<p style="margin:0 0 12px;font-size:14px;color:#333;">Hi ' +
     escapeHtml_(name) +
@@ -394,9 +382,7 @@ function renderFeedbackReminderEmail_(name, bookingRow, appUrl) {
     "</strong> at <strong>" +
     escapeHtml_(bookingRow["Slot Label"]) +
     "</strong> has wrapped up — we'd love a minute of your feedback.</p>" +
-    (rateUrl
-      ? ctaButton_(rateUrl, "Submit feedback")
-      : '<p style="font-size:13px;color:#b3261e;margin:0 0 12px;">(Set APP_URL in the Config tab to include a direct link here.)</p>') +
+    ctaButton_(TT_APP_URL + "/rate", "Submit feedback") +
     '<p style="margin:20px 0 0;font-size:12.5px;color:#8a5a00;background:#fff8e1;border:1px solid #ffe6a3;border-radius:8px;padding:10px 14px;line-height:1.5;">' +
     "<strong>Note:</strong> Feedback is mandatory — until you submit it for this match, you won't be able to book another Table Tennis slot." +
     "</p>";

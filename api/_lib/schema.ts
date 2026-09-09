@@ -126,11 +126,6 @@ export const DEFAULT_CONFIG: { key: string; value: string; description: string }
   { key: "MATCH_MINUTES", value: "30", description: "Length of one match, in minutes." },
   { key: "GAP_MINUTES", value: "10", description: "Gap between matches, in minutes." },
   { key: "SLOT_COUNT", value: "7", description: "Number of slots generated per day." },
-  {
-    key: "APP_URL",
-    value: "",
-    description: "Live site URL (no trailing slash), e.g. https://table-tennis.10minuteschool.com — used by the Apps Script mailer to link the Rate & feedback page.",
-  },
 ];
 
 export const DEFAULT_QUESTIONS: {

@@ -23,10 +23,10 @@ so this script watches the `Bookings` tab directly and marks each row's
 1. Open the spreadsheet → **Extensions → Apps Script**.
 2. Paste the contents of [`TableTennisMailer.gs`](./TableTennisMailer.gs) into
    the editor (replacing the default empty `Code.gs`, or as a new file).
-3. In the sheet's **Config** tab, fill in the `APP_URL` row with your live
-   site URL (no trailing slash) — this builds the "Submit feedback" /
-   "View my bookings" buttons in the emails. Leave it blank and those emails
-   just skip the button.
+3. The live site URL for the "Submit feedback" / "View my bookings" buttons
+   is the hardcoded `TT_APP_URL` constant near the top of the script —
+   already set to the live domain. Edit that one line if the domain ever
+   changes.
 4. Back in the Apps Script editor, pick `setupTableTennisMailer` from the
    function dropdown at the top and click **Run**. Approve the authorization
    prompt (it needs permission to send email and read/write the spreadsheet)
