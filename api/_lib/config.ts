@@ -16,8 +16,9 @@
  *   SLOT_COUNT           slots generated per day (default 7)
  *   ADMIN_EMAILS         comma-separated emails that get the Admin view
  */
-import { readTable } from "./sheets.js";
-import { TAB } from "./schema.js";
+import { readTable, appendRows, patchCells, invalidate } from "./sheets.js";
+import { TAB, DEFAULT_CONFIG } from "./schema.js";
+import { HttpError } from "./util.js";
 import { buildSlots, type SlotDef } from "../../src/shared/slots.js";
 
 export interface AppConfig {
@@ -96,4 +97,117 @@ export async function getSlots(): Promise<SlotDef[]> {
     gapMinutes: c.gapMinutes,
     slotCount: c.slotCount,
   });
+}
+
+/* ------------------------------------------------------------------ *
+ * Admin: read / write the Config tab from the admin panel
+ * ------------------------------------------------------------------ */
+
+export interface ConfigRow {
+  key: string;
+  value: string;
+  description: string;
+}
+
+/** Every known setting with its current sheet value (or the built-in
+ *  default), plus any extra rows someone added to the tab by hand. */
+export async function listConfigRows(): Promise<ConfigRow[]> {
+  let sheetRows: ConfigRow[] = [];
+  try {
+    const t = await readTable(TAB.Config);
+    sheetRows = t.rows
+      .filter((r) => (r["Key"] || "").trim())
+      .map((r) => ({
+        key: (r["Key"] || "").trim(),
+        value: (r["Value"] || "").trim(),
+        description: (r["Description"] || "").trim(),
+      }));
+  } catch {
+    /* tab not provisioned — fall through to defaults */
+  }
+  const bySheet = new Map(sheetRows.map((r) => [r.key, r]));
+  const out: ConfigRow[] = DEFAULT_CONFIG.map((d) => {
+    const s = bySheet.get(d.key);
+    return { key: d.key, value: s ? s.value : d.value, description: (s && s.description) || d.description };
+  });
+  for (const r of sheetRows) {
+    if (!DEFAULT_CONFIG.some((d) => d.key === r.key)) out.push(r);
+  }
+  return out;
+}
+
+const EDITABLE_KEYS = new Set(DEFAULT_CONFIG.map((d) => d.key));
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function validateSetting(key: string, raw: string, requesterEmail: string): string {
+  const v = String(raw ?? "").trim();
+  switch (key) {
+    case "FACILITY_START":
+    case "FACILITY_END": {
+      const m = v.match(/^(\d{1,2}):(\d{2})$/);
+      if (!m || Number(m[1]) > 23 || Number(m[2]) > 59) {
+        throw new HttpError(400, `${key} must be a 24-hour time like 13:00.`);
+      }
+      return `${m[1].padStart(2, "0")}:${m[2]}`;
+    }
+    case "MATCH_MINUTES":
+    case "SLOT_COUNT":
+    case "BOOKING_HORIZON_DAYS": {
+      const n = Number(v);
+      if (!Number.isInteger(n) || n < 1) throw new HttpError(400, `${key} must be a whole number of at least 1.`);
+      return String(n);
+    }
+    case "GAP_MINUTES": {
+      const n = Number(v);
+      if (!Number.isInteger(n) || n < 0) throw new HttpError(400, `${key} must be 0 or a positive whole number.`);
+      return String(n);
+    }
+    case "ALLOW_RATING_EDIT": {
+      if (/^(true|yes|1|on)$/i.test(v)) return "TRUE";
+      if (/^(false|no|0|off)$/i.test(v)) return "FALSE";
+      throw new HttpError(400, "ALLOW_RATING_EDIT must be TRUE or FALSE.");
+    }
+    case "ADMIN_EMAILS": {
+      const list = [...new Set(v.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean))];
+      if (!list.length) throw new HttpError(400, "At least one admin email is required.");
+      for (const e of list) if (!EMAIL_RE.test(e)) throw new HttpError(400, `"${e}" isn't a valid email.`);
+      if (!list.includes(requesterEmail.toLowerCase())) {
+        throw new HttpError(400, "You can't remove your own admin access — keep your email in the list.");
+      }
+      return list.join(", ");
+    }
+    case "HR_ADMIN_EMAIL":
+      if (v && !EMAIL_RE.test(v)) throw new HttpError(400, "HR_ADMIN_EMAIL must be a valid email or blank.");
+      return v;
+    default:
+      return v;
+  }
+}
+
+/** Apply admin edits to the Config tab. `updates` is a Key→Value map;
+ *  unknown keys are ignored. Returns the fresh row list. */
+export async function saveConfig(updates: Record<string, string>, requesterEmail: string): Promise<ConfigRow[]> {
+  const keys = Object.keys(updates || {}).filter((k) => EDITABLE_KEYS.has(k));
+  if (!keys.length) throw new HttpError(400, "Nothing editable in this request.");
+
+  const clean: Record<string, string> = {};
+  for (const k of keys) clean[k] = validateSetting(k, updates[k], requesterEmail);
+
+  const t = await readTable(TAB.Config, { fresh: true });
+  const rowByKey = new Map<string, number>();
+  t.rows.forEach((r, i) => {
+    const k = (r["Key"] || "").trim();
+    if (k) rowByKey.set(k, t.rowNumbers[i]);
+  });
+  const descByKey = new Map(DEFAULT_CONFIG.map((d) => [d.key, d.description]));
+
+  const toAppend: Record<string, unknown>[] = [];
+  for (const [k, val] of Object.entries(clean)) {
+    const rn = rowByKey.get(k);
+    if (rn) await patchCells(TAB.Config, rn, { Value: val });
+    else toAppend.push({ Key: k, Value: val, Description: descByKey.get(k) || "" });
+  }
+  if (toAppend.length) await appendRows(TAB.Config, toAppend);
+  invalidate(TAB.Config);
+  return listConfigRows();
 }

@@ -56,6 +56,11 @@ tab (not on the roster → rejected), and checks it against **`ADMIN_EMAILS`**
 everyone else only sees the user view. Admin API routes re-verify the token on
 every call. There's no separate admin password anymore.
 
+The Config tab (slot timing, `ADMIN_EMAILS`, booking rules, HR recipient) is
+editable in-app from **Admin panel → ⚙️ Settings** — same effect as editing the
+sheet directly, with validation and a live slot preview. You can't remove your
+own email from `ADMIN_EMAILS` there.
+
 ## Email dispatcher (Apps Script)
 
 Open the spreadsheet ▸ Extensions ▸ Apps Script, paste `apps-script/Code.gs`,

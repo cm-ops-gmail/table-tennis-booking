@@ -401,6 +401,57 @@ async function main() {
     const restoredCfg = await call("/config");
     ok("config reverts cleanly once the sheet values are restored", restoredCfg.body.slots.length === 7);
 
+    console.log("\nadmin: edit the Config tab in-app");
+    const cfgRows = await call("/admin/config", { admin: true });
+    ok(
+      "GET /admin/config lists the known settings",
+      cfgRows.status === 200 &&
+        Array.isArray(cfgRows.body.rows) &&
+        cfgRows.body.rows.some((r: any) => r.key === "ADMIN_EMAILS") &&
+        cfgRows.body.rows.some((r: any) => r.key === "SLOT_COUNT")
+    );
+    const badTime = await call("/admin/config", {
+      admin: true,
+      method: "PUT",
+      body: { updates: { FACILITY_START: "99:99" } },
+    });
+    ok("PUT /admin/config rejects an invalid time (400)", badTime.status === 400);
+    const lockout = await call("/admin/config", {
+      admin: true,
+      method: "PUT",
+      body: { updates: { ADMIN_EMAILS: "someoneelse@10ms.test" } },
+    });
+    ok("PUT /admin/config blocks removing your own admin access (400)", lockout.status === 400);
+
+    const savedTiming = await call("/admin/config", {
+      admin: true,
+      method: "PUT",
+      body: { updates: { SLOT_COUNT: "4", FACILITY_START: "08:00" } },
+    });
+    ok("PUT /admin/config saves valid timing", savedTiming.status === 200);
+    const afterSave = await call("/config");
+    ok(
+      "the saved timing drives /config immediately",
+      afterSave.body.slots.length === 4 && afterSave.body.slots[0].start === "08:00",
+      JSON.stringify(afterSave.body.slots)
+    );
+
+    const addAdmin = await call("/admin/config", {
+      admin: true,
+      method: "PUT",
+      body: { updates: { ADMIN_EMAILS: `${ADMIN_EMAIL}, bob@10ms.test` } },
+    });
+    ok("PUT /admin/config adds a second admin", addAdmin.status === 200);
+    const bobNow = await call("/auth/sso", { method: "POST", asEmail: "bob@10ms.test" });
+    ok("the newly added admin is recognised by /auth/sso", bobNow.body.isAdmin === true);
+
+    // restore
+    await call("/admin/config", {
+      admin: true,
+      method: "PUT",
+      body: { updates: { SLOT_COUNT: "7", FACILITY_START: "13:00", ADMIN_EMAILS: ADMIN_EMAIL } },
+    });
+
     console.log(`\n${pass} passed, ${fail} failed\n`);
     process.exitCode = fail === 0 ? 0 : 1;
   } finally {

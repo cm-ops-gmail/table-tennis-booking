@@ -11,7 +11,7 @@ import type {
   EmployeeLite,
   RatingQuestion,
 } from "../shared/types";
-import type { SlotDef } from "../shared/slots";
+import { buildSlots, type SlotDef } from "../shared/slots";
 import { EmployeePicker } from "../components/EmployeePicker";
 import { toast } from "../components/Toaster";
 import { burstConfetti } from "../lib/confetti";
@@ -76,6 +76,7 @@ export default function Admin() {
           <TabsTrigger value="users">🚫 Blocked users</TabsTrigger>
           <TabsTrigger value="questions">❓ Rating questions</TabsTrigger>
           <TabsTrigger value="reports">⭐ Feedback</TabsTrigger>
+          <TabsTrigger value="settings">⚙️ Settings</TabsTrigger>
         </TabsList>
         <TabsContent value="dashboard">
           <Dashboard onJump={setTab} />
@@ -100,6 +101,9 @@ export default function Admin() {
         </TabsContent>
         <TabsContent value="reports">
           <RatingReports />
+        </TabsContent>
+        <TabsContent value="settings">
+          <SettingsAdmin />
         </TabsContent>
       </Tabs>
     </div>
@@ -1490,6 +1494,180 @@ function RatingReports() {
           )}
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ *
+ * Settings — the Config tab, editable in-app
+ * ------------------------------------------------------------------ */
+
+type ConfigRow = { key: string; value: string; description: string };
+
+const SETTINGS_GROUPS: { title: string; hint?: string; keys: string[] }[] = [
+  { title: "Admin access", keys: ["ADMIN_EMAILS"] },
+  {
+    title: "Slot timing",
+    hint: "Saved changes take effect immediately — the booking grid regenerates from these.",
+    keys: ["FACILITY_START", "MATCH_MINUTES", "GAP_MINUTES", "SLOT_COUNT", "FACILITY_END"],
+  },
+  { title: "Booking rules", keys: ["BOOKING_HORIZON_DAYS", "ALLOW_RATING_EDIT"] },
+  { title: "HR notifications", keys: ["HR_ADMIN_EMAIL", "HR_ADMIN_NAME"] },
+];
+
+const SETTINGS_LABELS: Record<string, string> = {
+  ADMIN_EMAILS: "Admin emails (comma-separated)",
+  FACILITY_START: "First slot start · 24h HH:MM",
+  FACILITY_END: "Closing time shown to staff · 24h HH:MM",
+  MATCH_MINUTES: "Match length (minutes)",
+  GAP_MINUTES: "Gap between matches (minutes)",
+  SLOT_COUNT: "Slots per day",
+  BOOKING_HORIZON_DAYS: "Days ahead bookable",
+  ALLOW_RATING_EDIT: "Let staff edit a submitted rating",
+  HR_ADMIN_EMAIL: "HR notification email",
+  HR_ADMIN_NAME: "HR display name",
+};
+
+function SettingsAdmin() {
+  const { data, loading, error, reload } = useAsync(
+    () => api<{ rows: ConfigRow[] }>("/admin/config", { admin: true }),
+    []
+  );
+  const [edited, setEdited] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  const [saveErr, setSaveErr] = useState("");
+
+  if (loading) return <Loader />;
+  if (error) return <Alert tone="error">{error}</Alert>;
+  if (!data) return null;
+
+  const base: Record<string, string> = {};
+  const descByKey: Record<string, string> = {};
+  for (const r of data.rows) {
+    base[r.key] = r.value;
+    descByKey[r.key] = r.description;
+  }
+
+  const cur = (k: string) => (k in edited ? edited[k] : base[k] ?? "");
+  const setVal = (k: string, v: string) => setEdited((e) => ({ ...e, [k]: v }));
+  const changedKeys = Object.keys(edited).filter((k) => (edited[k] ?? "") !== (base[k] ?? ""));
+  const dirty = changedKeys.length > 0;
+
+  const timingOk =
+    /^\d{1,2}:\d{2}$/.test(cur("FACILITY_START")) &&
+    ["MATCH_MINUTES", "GAP_MINUTES", "SLOT_COUNT"].every((k) => {
+      const n = Number(cur(k));
+      return cur(k) !== "" && Number.isInteger(n) && n >= 0;
+    }) &&
+    Number(cur("SLOT_COUNT")) >= 1 &&
+    Number(cur("SLOT_COUNT")) <= 40;
+  let preview: SlotDef[] = [];
+  if (timingOk) {
+    try {
+      preview = buildSlots({
+        facilityStart: cur("FACILITY_START"),
+        matchMinutes: Number(cur("MATCH_MINUTES")),
+        gapMinutes: Number(cur("GAP_MINUTES")),
+        slotCount: Number(cur("SLOT_COUNT")),
+      });
+    } catch {
+      preview = [];
+    }
+  }
+
+  async function save() {
+    setSaving(true);
+    setSaveErr("");
+    try {
+      const updates: Record<string, string> = {};
+      for (const k of changedKeys) updates[k] = edited[k];
+      await api("/admin/config", { method: "PUT", admin: true, body: { updates } });
+      toast("Settings saved", { tone: "success", desc: "Changes are live now." });
+      setEdited({});
+      reload();
+    } catch (e) {
+      setSaveErr(e instanceof ApiError ? e.message : "Save failed.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-5">
+      <p className="text-sm text-muted-foreground">
+        These are the rows of the sheet&rsquo;s <span className="font-medium text-foreground">Config</span> tab. Editing
+        here is the same as editing the sheet directly.
+      </p>
+
+      {SETTINGS_GROUPS.map((g) => (
+        <Card key={g.title}>
+          <CardContent className="pt-5">
+            <h2 className="text-sm font-semibold">{g.title}</h2>
+            {g.hint && <p className="mt-0.5 text-xs text-muted-foreground">{g.hint}</p>}
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              {g.keys.map((k) => (
+                <Field
+                  key={k}
+                  label={SETTINGS_LABELS[k] ?? k}
+                  hint={descByKey[k]}
+                  className={k === "ADMIN_EMAILS" ? "sm:col-span-2" : undefined}
+                >
+                  {k === "ALLOW_RATING_EDIT" ? (
+                    <Select
+                      value={/^true$/i.test(cur(k)) ? "TRUE" : "FALSE"}
+                      onChange={(e) => setVal(k, e.target.value)}
+                    >
+                      <option value="TRUE">Allowed</option>
+                      <option value="FALSE">Not allowed</option>
+                    </Select>
+                  ) : k === "ADMIN_EMAILS" ? (
+                    <Textarea
+                      rows={2}
+                      value={cur(k)}
+                      onChange={(e) => setVal(k, e.target.value)}
+                      placeholder="a@10minuteschool.com, b@10minuteschool.com"
+                    />
+                  ) : (
+                    <Input
+                      value={cur(k)}
+                      onChange={(e) => setVal(k, e.target.value)}
+                      inputMode={/(MINUTES|COUNT|DAYS)$/.test(k) ? "numeric" : undefined}
+                    />
+                  )}
+                </Field>
+              ))}
+            </div>
+            {g.title === "Slot timing" && (
+              <p className="mt-3 text-xs text-muted-foreground">
+                {preview.length ? (
+                  <>
+                    Preview:{" "}
+                    <span className="font-medium text-foreground">
+                      {preview.length} slot{preview.length === 1 ? "" : "s"}
+                    </span>{" "}
+                    · {preview[0].label.split(" – ")[0]} to {preview[preview.length - 1].label.split(" – ")[1]}
+                  </>
+                ) : (
+                  "Preview unavailable — check the timing values."
+                )}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      ))}
+
+      {saveErr && <Alert tone="error">{saveErr}</Alert>}
+
+      <div className="flex items-center gap-3">
+        <Button onClick={save} loading={saving} disabled={!dirty}>
+          {dirty ? `Save ${changedKeys.length} change${changedKeys.length === 1 ? "" : "s"}` : "No changes"}
+        </Button>
+        {dirty && (
+          <Button variant="outline" onClick={() => setEdited({})} disabled={saving}>
+            Discard
+          </Button>
+        )}
+      </div>
     </div>
   );
 }

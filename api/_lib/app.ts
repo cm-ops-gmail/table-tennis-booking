@@ -1,7 +1,7 @@
 import express, { type Request, type Response, type NextFunction } from "express";
 import { HttpError, ymd, isValidYmd } from "./util.js";
 import { listEmployees, findByEmail, toLite } from "./employees.js";
-import { getConfig, getSlots } from "./config.js";
+import { getConfig, getSlots, listConfigRows, saveConfig } from "./config.js";
 import { getDayAvailability } from "./availability.js";
 import {
   createBooking,
@@ -328,6 +328,19 @@ export function createApp() {
   );
 
   admin.get("/ratings", wrap(async (_req, res) => res.json(await ratingReport())));
+
+  // Config tab, editable from the admin panel (slot timing, admin list, …).
+  admin.get("/config", wrap(async (_req, res) => res.json({ rows: await listConfigRows() })));
+  admin.put(
+    "/config",
+    wrap(async (req, res) => {
+      const { email } = await resolveIdentity(req); // cached from requireAdmin
+      const body = req.body || {};
+      const updates =
+        body.updates && typeof body.updates === "object" ? body.updates : (body as Record<string, string>);
+      res.json({ rows: await saveConfig(updates, email) });
+    })
+  );
 
   api.use("/admin", admin);
   app.use("/api", api);
