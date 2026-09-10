@@ -126,6 +126,12 @@ export const DEFAULT_CONFIG: { key: string; value: string; description: string }
   { key: "MATCH_MINUTES", value: "30", description: "Length of one match, in minutes." },
   { key: "GAP_MINUTES", value: "10", description: "Gap between matches, in minutes." },
   { key: "SLOT_COUNT", value: "7", description: "Number of slots generated per day." },
+  {
+    key: "ADMIN_EMAILS",
+    value: "",
+    description:
+      "Comma-separated emails that get the Admin view after signing in with 10MS SSO (matched case-insensitively). Everyone else on the roster gets the user view only.",
+  },
 ];
 
 export const DEFAULT_QUESTIONS: {

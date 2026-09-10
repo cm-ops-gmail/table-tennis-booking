@@ -1,10 +1,19 @@
 import { useEffect, useState } from "react";
-import { Link, NavLink, Route, Routes, useNavigate, Navigate, useLocation } from "react-router-dom";
-import { Button, cx } from "./components/ui";
+import { Link, NavLink, Route, Routes, Navigate, useLocation } from "react-router-dom";
+import { useTenMSAuth } from "@tenminuteschool/auth-admin-react";
+import { Button, BallLoader, cx } from "./components/ui";
 import { Toaster } from "./components/Toaster";
 import { api } from "./lib/api";
 import { to12h } from "./shared/slots";
-import { getEmployee, initTheme, isDark, setEmployee, toggleTheme, useEmployee } from "./lib/session";
+import {
+  initTheme,
+  isDark,
+  toggleTheme,
+  useEmployee,
+  useIsAdmin,
+  resolveIdentity,
+  signOut,
+} from "./lib/session";
 import Login from "./pages/Login";
 import Book from "./pages/Book";
 import MyBookings from "./pages/MyBookings";
@@ -41,9 +50,27 @@ function ThemeToggle() {
   );
 }
 
+/** Sign-out control shared by both shells — clears the 10MS SSO session and
+ *  the roster identity, then lets <AuthGate> fall back to the login screen. */
+function SignOutButton() {
+  const { refresh } = useTenMSAuth();
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={async () => {
+        await signOut();
+        refresh();
+      }}
+    >
+      Sign out
+    </Button>
+  );
+}
+
 function Shell({ children }: { children: React.ReactNode }) {
   const employee = useEmployee();
-  const navigate = useNavigate();
+  const isAdmin = useIsAdmin();
   const location = useLocation();
   // Operating hours are set in the sheet's Config tab now, not hardcoded —
   // fetch once so the footer never drifts from the real slot timing.
@@ -94,6 +121,14 @@ function Shell({ children }: { children: React.ReactNode }) {
           </nav>
 
           <div className="ml-auto flex items-center gap-2">
+            {isAdmin && (
+              <Link
+                to="/admin"
+                className="tt-press hidden rounded-lg border border-input px-2.5 py-1.5 text-sm font-medium no-underline transition-colors hover:bg-accent sm:inline-block"
+              >
+                🛠️ Admin view
+              </Link>
+            )}
             <ThemeToggle />
             {employee && (
               <div className="flex items-center gap-2">
@@ -106,16 +141,7 @@ function Shell({ children }: { children: React.ReactNode }) {
                 <span className="hidden h-8 w-8 place-items-center rounded-full bg-primary text-xs font-semibold text-primary-foreground sm:grid">
                   {employee.name.split(" ").map((w) => w[0]).slice(0, 2).join("")}
                 </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setEmployee(null);
-                    navigate("/login");
-                  }}
-                >
-                  Sign out
-                </Button>
+                <SignOutButton />
               </div>
             )}
           </div>
@@ -135,10 +161,15 @@ function Shell({ children }: { children: React.ReactNode }) {
         <footer className="mx-auto max-w-6xl px-4 pb-10 pt-4 text-center text-xs text-muted-foreground">
           🏓 Internal facility tool · Operating hours{" "}
           {hours ? `${to12h(hours.start)} – ${to12h(hours.end)}` : "1:00 PM – 5:30 PM"} · one match per person per
-          day ·{" "}
-          <Link to="/admin" className="underline decoration-dotted underline-offset-2 hover:text-foreground">
-            Admin
-          </Link>
+          day
+          {isAdmin && (
+            <>
+              {" "}·{" "}
+              <Link to="/admin" className="underline decoration-dotted underline-offset-2 hover:text-foreground">
+                Admin
+              </Link>
+            </>
+          )}
         </footer>
       )}
       <Toaster />
@@ -146,7 +177,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** Standalone chrome for the admin area — no employee session required. */
+/** Chrome for the admin view. Reachable only by admins (route-guarded). */
 function AdminShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-full">
@@ -159,46 +190,108 @@ function AdminShell({ children }: { children: React.ReactNode }) {
             <span className="hidden text-foreground sm:inline">Table Tennis · Admin</span>
           </Link>
           <div className="ml-auto flex items-center gap-2">
-            <ThemeToggle />
             <Link
-              to="/login"
-              className="rounded-md border border-input px-3 py-1.5 text-sm font-medium no-underline transition-colors hover:bg-accent"
+              to="/"
+              className="tt-press rounded-lg border border-input px-2.5 py-1.5 text-sm font-medium no-underline transition-colors hover:bg-accent"
             >
-              Employee login
+              ← User view
             </Link>
+            <ThemeToggle />
+            <SignOutButton />
           </div>
         </div>
       </header>
       <main className="tt-rise mx-auto max-w-6xl px-4 py-6">{children}</main>
       <footer className="mx-auto max-w-6xl px-4 pb-10 pt-4 text-center text-xs text-muted-foreground">
-        🛠️ Admin area · separate sign-in from the employee booking portal
+        🛠️ Admin view · you also have the regular user view via “← User view” above
       </footer>
       <Toaster />
     </div>
   );
 }
 
-function RequireAuth({ children }: { children: React.ReactNode }) {
-  if (!getEmployee()) return <Navigate to="/login" replace />;
+function Splash({ label }: { label: string }) {
+  return (
+    <div className="grid min-h-screen place-items-center bg-main-gray">
+      <BallLoader label={label} />
+    </div>
+  );
+}
+
+function RosterError({ message, onSignOut }: { message: string; onSignOut: () => void }) {
+  return (
+    <div className="grid min-h-screen place-items-center bg-main-gray p-4">
+      <div className="w-full max-w-sm rounded-xl border border-border bg-card p-6 text-center shadow-lg">
+        <div className="text-3xl">🚫</div>
+        <h1 className="mt-2 text-lg font-semibold">Can’t sign you in</h1>
+        <p className="mt-1 text-sm text-muted-foreground">{message}</p>
+        <Button variant="outline" className="mt-4 w-full" onClick={onSignOut}>
+          Sign out and try another account
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Gates the whole app on a 10MS SSO session that also maps to a TT-roster
+ * employee. Handles the initial session check (including a cross-app
+ * `tenms_token` handoff, done by TenMSAuthProvider), then exchanges that
+ * session for the roster identity via /auth/sso.
+ */
+function AuthGate({ children }: { children: React.ReactNode }) {
+  const { user, loading, refresh, error: handoffError } = useTenMSAuth();
+  const employee = useEmployee();
+  const [phase, setPhase] = useState<"idle" | "resolving" | "error">("idle");
+  const [errorMsg, setErrorMsg] = useState("");
+
+  useEffect(() => {
+    if (loading || !user || employee || phase === "resolving" || phase === "error") return;
+    setPhase("resolving");
+    resolveIdentity().then((r) => {
+      if (r.ok) setPhase("idle");
+      else {
+        setErrorMsg(r.error);
+        setPhase("error");
+      }
+    });
+  }, [loading, user, employee, phase]);
+
+  async function doLogout() {
+    await signOut();
+    refresh();
+    setErrorMsg("");
+    setPhase("idle");
+  }
+
+  if (loading) return <Splash label="Loading…" />;
+  if (!user) return <Login handoffError={handoffError} />;
+  if (phase === "error") return <RosterError message={errorMsg} onSignOut={doLogout} />;
+  if (!employee) return <Splash label="Signing you in…" />;
   return <>{children}</>;
 }
 
 export default function App() {
+  const isAdmin = useIsAdmin();
   return (
-    <Routes>
-      <Route path="/login" element={<Login />} />
-      <Route
-        path="/admin"
-        element={
-          <AdminShell>
-            <Admin />
-          </AdminShell>
-        }
-      />
-      <Route
-        path="/*"
-        element={
-          <RequireAuth>
+    <AuthGate>
+      <Routes>
+        <Route path="/login" element={<Navigate to="/" replace />} />
+        <Route
+          path="/admin"
+          element={
+            isAdmin ? (
+              <AdminShell>
+                <Admin />
+              </AdminShell>
+            ) : (
+              <Navigate to="/" replace />
+            )
+          }
+        />
+        <Route
+          path="/*"
+          element={
             <Shell>
               <Routes>
                 <Route path="/" element={<Book />} />
@@ -208,9 +301,9 @@ export default function App() {
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </Shell>
-          </RequireAuth>
-        }
-      />
-    </Routes>
+          }
+        />
+      </Routes>
+    </AuthGate>
   );
 }

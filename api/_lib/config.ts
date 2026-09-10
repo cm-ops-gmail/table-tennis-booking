@@ -14,6 +14,7 @@
  *   MATCH_MINUTES        length of one match in minutes (default 30)
  *   GAP_MINUTES          gap between matches in minutes (default 10)
  *   SLOT_COUNT           slots generated per day (default 7)
+ *   ADMIN_EMAILS         comma-separated emails that get the Admin view
  */
 import { readTable } from "./sheets.js";
 import { TAB } from "./schema.js";
@@ -29,6 +30,8 @@ export interface AppConfig {
   matchMinutes: number;
   gapMinutes: number;
   slotCount: number;
+  /** Lower-cased emails allowed into the Admin view. */
+  adminEmails: string[];
 }
 
 async function sheetValues(): Promise<Map<string, string>> {
@@ -72,6 +75,10 @@ export async function getConfig(): Promise<AppConfig> {
     matchMinutes: Number.isFinite(matchMinutes) && matchMinutes > 0 ? matchMinutes : 30,
     gapMinutes: Number.isFinite(gapMinutes) && gapMinutes >= 0 ? gapMinutes : 10,
     slotCount: Number.isFinite(slotCount) && slotCount > 0 ? slotCount : 7,
+    adminEmails: pick(sheet, "ADMIN_EMAILS", process.env.ADMIN_EMAILS, "")
+      .split(",")
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean),
   };
 }
 

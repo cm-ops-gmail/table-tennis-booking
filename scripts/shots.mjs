@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 
 process.env.TT_MEMORY_SHEET = "1";
 process.env.ADMIN_PASSWORD = "test";
+process.env.ADMIN_EMAILS = "alice@10ms.test";
 process.env.GOOGLE_SPREADSHEET_ID = "memory";
 process.env.GOOGLE_CLIENT_EMAIL = "memory@test";
 process.env.GOOGLE_PRIVATE_KEY = "memory";
@@ -44,9 +45,20 @@ async function shot(name, url, { dark = false, auth = true, before } = {}) {
   await page.evaluate(
     (emp, dark, auth) => {
       localStorage.clear();
-      if (auth) localStorage.setItem("tt_employee", JSON.stringify(emp));
-      localStorage.setItem("tt_admin_token", "test");
       localStorage.setItem("tt_theme", dark ? "dark" : "light");
+      if (auth) {
+        // Fake a resolved roster identity + a 10MS SSO session so <AuthGate>
+        // lets us straight in. The offline backend (TT_MEMORY_SHEET=1)
+        // reads the email out of the Bearer token slot — see api/_lib/auth.ts.
+        localStorage.setItem("tt_employee", JSON.stringify(emp));
+        localStorage.setItem("tt_is_admin", "1");
+        localStorage.setItem("_tenms_admin_access_token", emp.email);
+        localStorage.setItem("_tenms_admin_expires_at", String(Math.floor(Date.now() / 1000) + 3600));
+        localStorage.setItem(
+          "_tenms_admin_user",
+          JSON.stringify({ sub: emp.employeeId, name: emp.name, email: emp.email })
+        );
+      }
     },
     seedEmployee,
     dark,

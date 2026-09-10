@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { api, ApiError, getAdminToken, setAdminToken } from "../lib/api";
+import { api, ApiError } from "../lib/api";
 import { useEmployee } from "../lib/session";
 import type {
   AdminStats,
@@ -53,60 +53,10 @@ import {
 } from "../components/ui";
 
 export default function Admin() {
-  const [authed, setAuthed] = useState<boolean>(!!getAdminToken());
-  const [password, setPassword] = useState("");
-  const [err, setErr] = useState("");
-  const [loading, setLoading] = useState(false);
+  // Reachable only for admins — <AuthGate> + the /admin route guard in
+  // App.tsx handle that, and every admin API call carries the SSO Bearer
+  // token (see api.ts), which the server re-verifies against ADMIN_EMAILS.
   const [tab, setTab] = useState("dashboard");
-
-  async function login(e: React.FormEvent) {
-    e.preventDefault();
-    setErr("");
-    setLoading(true);
-    try {
-      const { token } = await api<{ token: string }>("/auth/admin", { body: { password } });
-      setAdminToken(token);
-      setAuthed(true);
-    } catch (e) {
-      setErr(e instanceof ApiError ? e.message : "Login failed.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  if (!authed) {
-    return (
-      <div className="mx-auto max-w-sm pt-10">
-        <div className="mb-5 flex flex-col items-center gap-2 text-center">
-          <span className="grid h-12 w-12 place-items-center rounded-2xl bg-primary text-2xl text-primary-foreground shadow-md">
-            🛠️
-          </span>
-          <h1 className="text-lg font-semibold">Admin sign-in</h1>
-          <p className="text-sm text-muted-foreground">
-            This is a separate sign-in from the employee booking portal — just the shared admin
-            password, no office email needed.
-          </p>
-        </div>
-        <Card className="shadow-lg">
-          <CardContent className="pt-5">
-            <form onSubmit={login} className="flex flex-col gap-3">
-              <Input
-                type="password"
-                autoFocus
-                placeholder="Admin password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-              {err && <Alert tone="error">{err}</Alert>}
-              <Button type="submit" loading={loading} className="w-full">
-                Sign in
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div className="flex flex-col gap-5">
@@ -114,16 +64,6 @@ export default function Admin() {
         <h1 className="flex items-center gap-2 text-xl font-semibold">
           <span>🛠️</span> Admin panel
         </h1>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            setAdminToken(null);
-            setAuthed(false);
-          }}
-        >
-          Sign out
-        </Button>
       </div>
 
       <Tabs value={tab} onValueChange={setTab}>

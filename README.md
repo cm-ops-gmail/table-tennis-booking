@@ -17,9 +17,12 @@ Internal facility booking tool for 10 Minute School, built to the PRD in
 1. `npm install`
 2. Copy `.env.example` → `.env` and fill in:
    - `GOOGLE_CLIENT_EMAIL`, `GOOGLE_PRIVATE_KEY`, `GOOGLE_SPREADSHEET_ID`
-   - `ADMIN_PASSWORD` — shared password for the Admin Panel
+   - `VITE_TENMS_CLIENT_ID` — the "Login with 10MS" OAuth client (register its
+     redirect URI as your site origin: `http://localhost:5173` for dev, the
+     Vercel URL for prod). Goes in `.env.local` for Vite.
    - `HR_ADMIN_EMAIL` — who gets the `[HR]` booking notifications
-   - optional: `BOOKING_HORIZON_DAYS` (14), `ALLOW_RATING_EDIT` (true), `FACILITY_START`/`FACILITY_END`
+   - optional: `ADMIN_EMAILS` (fallback for the Config-tab value),
+     `BOOKING_HORIZON_DAYS` (14), `ALLOW_RATING_EDIT` (true), `FACILITY_START`/`FACILITY_END`
 3. **Share the spreadsheet** with `GOOGLE_CLIENT_EMAIL` as **Editor**.
 4. `npm run provision` — creates the 5 app tabs with the right headers and seeds
    the default rating questions. Safe to re-run (only adds what's missing; never
@@ -42,6 +45,16 @@ up if present: `Department`, `Designation`, `Line Manager Name`.
 - Add the same env vars in the Vercel project settings.
 - `npm run provision` once against the production sheet (or run locally with the
   prod `GOOGLE_SPREADSHEET_ID`).
+
+## Auth
+
+Everyone signs in once with **Login with 10MS** (`@tenminuteschool/auth-admin-react`,
+`VITE_TENMS_CLIENT_ID`). The backend verifies the token against
+`api.10minuteschool.com/auth/v1/oauth/userinfo`, matches the email to the `TT`
+tab (not on the roster → rejected), and checks it against **`ADMIN_EMAILS`**
+(Config tab, comma-separated). Admins get a **User view / Admin view** toggle;
+everyone else only sees the user view. Admin API routes re-verify the token on
+every call. There's no separate admin password anymore.
 
 ## Email dispatcher (Apps Script)
 

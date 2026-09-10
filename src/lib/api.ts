@@ -1,3 +1,5 @@
+import { auth } from "./auth";
+
 const BASE = "/api";
 
 export class ApiError extends Error {
@@ -11,17 +13,11 @@ export class ApiError extends Error {
 type Opts = {
   method?: string;
   body?: unknown;
+  /** Attach the 10MS SSO Bearer token (admin routes + /auth/sso). */
   admin?: boolean;
+  auth?: boolean;
   query?: Record<string, string | number | undefined>;
 };
-
-export function getAdminToken(): string | null {
-  return localStorage.getItem("tt_admin_token");
-}
-export function setAdminToken(t: string | null) {
-  if (t) localStorage.setItem("tt_admin_token", t);
-  else localStorage.removeItem("tt_admin_token");
-}
 
 export async function api<T = unknown>(path: string, opts: Opts = {}): Promise<T> {
   const url = new URL(BASE + path, window.location.origin);
@@ -32,9 +28,9 @@ export async function api<T = unknown>(path: string, opts: Opts = {}): Promise<T
   }
   const headers: Record<string, string> = {};
   if (opts.body !== undefined) headers["Content-Type"] = "application/json";
-  if (opts.admin) {
-    const t = getAdminToken();
-    if (t) headers["x-admin-token"] = t;
+  if (opts.admin || opts.auth) {
+    const token = await auth.getAccessToken();
+    if (token) headers["Authorization"] = `Bearer ${token}`;
   }
   const res = await fetch(url.toString(), {
     method: opts.method || (opts.body !== undefined ? "POST" : "GET"),

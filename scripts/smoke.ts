@@ -4,6 +4,10 @@
  */
 process.env.TT_MEMORY_SHEET = "1";
 process.env.ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "test";
+// In TT_MEMORY_SHEET mode the SSO token check is skipped and the identity
+// comes from the x-tenms-email header — E1 (alice) is the test admin.
+process.env.ADMIN_EMAILS = "alice@10ms.test";
+const ADMIN_EMAIL = "alice@10ms.test";
 process.env.HR_ADMIN_EMAIL = process.env.HR_ADMIN_EMAIL || "hr@10ms.test";
 process.env.GOOGLE_SPREADSHEET_ID = "memory";
 process.env.GOOGLE_CLIENT_EMAIL = "memory@test";
@@ -27,10 +31,14 @@ function ok(name: string, cond: boolean, extra = "") {
   }
 }
 
-async function call(path: string, opts: { method?: string; body?: unknown; admin?: boolean } = {}) {
+async function call(
+  path: string,
+  opts: { method?: string; body?: unknown; admin?: boolean; asEmail?: string } = {}
+) {
   const headers: Record<string, string> = {};
   if (opts.body !== undefined) headers["Content-Type"] = "application/json";
-  if (opts.admin) headers["x-admin-token"] = process.env.ADMIN_PASSWORD!;
+  if (opts.admin) headers["x-tenms-email"] = opts.asEmail ?? ADMIN_EMAIL;
+  else if (opts.asEmail) headers["x-tenms-email"] = opts.asEmail;
   const res = await fetch(BASE + path, {
     method: opts.method || (opts.body !== undefined ? "POST" : "GET"),
     headers,
@@ -161,10 +169,26 @@ async function main() {
     ok("participation rows carry owned + total", typeof ov.body.participation[0].owned === "number");
     ok("overview has recentRaters array", Array.isArray(ov.body.recentRaters));
 
-    console.log("\nadmin: blocking");
+    console.log("\nsso identity + admin gating");
     const noAuth = await call("/admin/overview");
-    ok("admin route needs token (401)", noAuth.status === 401);
+    ok("admin route rejects an unauthenticated caller (401)", noAuth.status === 401);
+    const nonAdmin = await call("/admin/overview", { asEmail: "bob@10ms.test" });
+    ok("admin route rejects a non-admin roster user (403)", nonAdmin.status === 403);
+    const stranger = await call("/auth/sso", { method: "POST", asEmail: "nobody@nowhere.test" });
+    ok("/auth/sso rejects an email not on the roster (403)", stranger.status === 403);
+    const meAdmin = await call("/auth/sso", { method: "POST", asEmail: ADMIN_EMAIL });
+    ok(
+      "/auth/sso returns the employee + isAdmin for a roster admin",
+      meAdmin.status === 200 && meAdmin.body.employee?.employeeId === "E1" && meAdmin.body.isAdmin === true,
+      JSON.stringify(meAdmin.body)
+    );
+    const meUser = await call("/auth/sso", { method: "POST", asEmail: "bob@10ms.test" });
+    ok(
+      "/auth/sso returns isAdmin=false for a non-admin roster user",
+      meUser.status === 200 && meUser.body.isAdmin === false
+    );
 
+    console.log("\nadmin: blocking");
     const overview = await call("/admin/overview", { admin: true });
     ok("admin overview ok", overview.status === 200 && typeof overview.body.stats.totalBookings === "number");
 

@@ -31,6 +31,7 @@ import {
   ratingReport,
 } from "./ratings.js";
 import { adminOverview, queryBookings } from "./admin.js";
+import { resolveIdentity } from "./auth.js";
 
 function wrap(fn: (req: Request, res: Response) => Promise<unknown>) {
   return (req: Request, res: Response, next: NextFunction) => {
@@ -38,12 +39,14 @@ function wrap(fn: (req: Request, res: Response) => Promise<unknown>) {
   };
 }
 
+/** Admin routes: a valid 10MS SSO session whose email is in ADMIN_EMAILS. */
 function requireAdmin(req: Request, _res: Response, next: NextFunction) {
-  const expected = process.env.ADMIN_PASSWORD;
-  const given = req.header("x-admin-token") || (req.body && req.body.adminToken);
-  if (!expected) throw new HttpError(500, "ADMIN_PASSWORD is not configured on the server.");
-  if (!given || given !== expected) throw new HttpError(401, "Invalid admin password.");
-  next();
+  resolveIdentity(req)
+    .then((id) => {
+      if (!id.isAdmin) throw new HttpError(403, "Your account doesn't have admin access.");
+      next();
+    })
+    .catch(next);
 }
 
 export function createApp() {
@@ -81,13 +84,15 @@ export function createApp() {
     })
   );
 
+  // After a 10MS SSO login the browser calls this with its Bearer token; we
+  // verify it, match the email to the roster, and report back whether this
+  // person is an admin. This is the one place the token is checked on the
+  // login path — see api/_lib/auth.ts.
   api.post(
-    "/auth/admin",
+    "/auth/sso",
     wrap(async (req, res) => {
-      const password = String(req.body?.password || "");
-      if (!process.env.ADMIN_PASSWORD) throw new HttpError(500, "ADMIN_PASSWORD is not configured.");
-      if (password !== process.env.ADMIN_PASSWORD) throw new HttpError(401, "Incorrect admin password.");
-      res.json({ ok: true, token: password });
+      const { employee, isAdmin } = await resolveIdentity(req);
+      res.json({ employee, isAdmin });
     })
   );
 
