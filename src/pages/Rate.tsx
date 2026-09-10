@@ -24,6 +24,19 @@ interface Ratable {
   alreadyRated: boolean;
 }
 
+/**
+ * Questions are authored in the sheet as one string with the scale legend
+ * tacked on, e.g. "How's your vibe? 🏓 1 = Meh 😐 → 5 = Fully recharged ⚡".
+ * Pull the "1 = … → 5 = …" part off so it can be shown as end labels under
+ * the buttons instead of a run-on sentence.
+ */
+function parseQuestion(raw: string): { text: string; minLabel?: string; maxLabel?: string } {
+  const s = (raw || "").trim();
+  const full = s.match(/^(.*?)\s*\b1\s*[=:]\s*(.+?)\s*(?:→|-+>|➔|—+>|›|»|\bto\b)\s*5\s*[=:]\s*(.+?)\s*$/is);
+  if (full) return { text: full[1].trim(), minLabel: full[2].trim(), maxLabel: full[3].trim() };
+  return { text: s };
+}
+
 export default function Rate() {
   const employee = useEmployee()!;
   const [questions, setQuestions] = useState<RatingQuestion[]>([]);
@@ -55,6 +68,10 @@ export default function Rate() {
   }, [employee.employeeId]);
 
   const selected = useMemo(() => bookings.find((b) => b.bookingId === bookingId), [bookings, bookingId]);
+  const answeredCount = useMemo(
+    () => questions.filter((q) => (answers[q.questionId] ?? "") !== "").length,
+    [questions, answers]
+  );
 
   useEffect(() => {
     setDone(false);
@@ -126,7 +143,7 @@ export default function Rate() {
             </Field>
 
             {selected && (
-              <p className="text-xs text-muted-foreground">Players: {selected.players.join(", ")}</p>
+              <p className="-mt-2 text-xs text-muted-foreground">Players: {selected.players.join(", ")}</p>
             )}
 
             {done ? (
@@ -139,15 +156,51 @@ export default function Rate() {
               <>
                 {questions.length === 0 && <Alert tone="info">No active rating questions right now.</Alert>}
 
-                {questions.map((q) => (
-                  <Field key={q.questionId} label={q.text}>
-                    <QuestionInput
-                      q={q}
-                      value={answers[q.questionId] ?? ""}
-                      onChange={(v) => setAnswer(q.questionId, v)}
-                    />
-                  </Field>
-                ))}
+                {questions.length > 0 && (
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-sm font-semibold">A few quick questions</h2>
+                    <span className="text-xs text-muted-foreground">
+                      {answeredCount}/{questions.length} answered
+                    </span>
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-3">
+                  {questions.map((q, i) => {
+                    const { text, minLabel, maxLabel } = parseQuestion(q.text);
+                    const answered = (answers[q.questionId] ?? "") !== "";
+                    return (
+                      <div
+                        key={q.questionId}
+                        className={cx(
+                          "rounded-xl border p-4 transition-colors",
+                          answered ? "border-[color:var(--success)]/40 bg-[color:var(--success)]/[0.04]" : "border-border"
+                        )}
+                      >
+                        <div className="mb-3 flex gap-2.5">
+                          <span
+                            className={cx(
+                              "mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full text-[11px] font-semibold",
+                              answered
+                                ? "bg-[color:var(--success)] text-white"
+                                : "bg-secondary text-muted-foreground"
+                            )}
+                          >
+                            {answered ? "✓" : i + 1}
+                          </span>
+                          <p className="text-sm font-medium leading-relaxed">{text}</p>
+                        </div>
+                        <QuestionInput
+                          q={q}
+                          value={answers[q.questionId] ?? ""}
+                          onChange={(v) => setAnswer(q.questionId, v)}
+                          minLabel={minLabel}
+                          maxLabel={maxLabel}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
 
                 {msg && <Alert tone={msg.tone}>{msg.text}</Alert>}
 
@@ -169,56 +222,76 @@ export default function Rate() {
   );
 }
 
+function EndLabels({ minLabel, maxLabel }: { minLabel?: string; maxLabel?: string }) {
+  if (!minLabel && !maxLabel) return null;
+  return (
+    <div className="mt-2 flex justify-between gap-3 text-[11px] leading-tight text-muted-foreground">
+      <span className="max-w-[45%]">{minLabel}</span>
+      <span className="max-w-[45%] text-right">{maxLabel}</span>
+    </div>
+  );
+}
+
 function QuestionInput({
   q,
   value,
   onChange,
+  minLabel,
+  maxLabel,
 }: {
   q: RatingQuestion;
   value: string;
   onChange: (v: string) => void;
+  minLabel?: string;
+  maxLabel?: string;
 }) {
   if (q.type === "star") {
     const cur = Number(value);
     return (
-      <div className="flex gap-1">
-        {[1, 2, 3, 4, 5].map((n) => (
-          <button
-            key={n}
-            type="button"
-            onClick={() => onChange(String(n))}
-            className={cx(
-              "tt-press text-3xl leading-none transition-transform hover:scale-125",
-              cur >= n ? "text-[color:var(--chart-4)] drop-shadow-sm" : "text-muted-foreground/30"
-            )}
-            aria-label={`${n} star`}
-          >
-            <span key={cur >= n ? "on" : "off"} className={cur === n ? "tt-pop inline-block" : ""}>
-              ★
-            </span>
-          </button>
-        ))}
+      <div>
+        <div className="flex gap-1.5">
+          {[1, 2, 3, 4, 5].map((n) => (
+            <button
+              key={n}
+              type="button"
+              onClick={() => onChange(String(n))}
+              className={cx(
+                "tt-press text-3xl leading-none transition-transform hover:scale-125",
+                cur >= n ? "text-[color:var(--chart-4)] drop-shadow-sm" : "text-muted-foreground/30"
+              )}
+              aria-label={`${n} star`}
+            >
+              <span key={cur >= n ? "on" : "off"} className={cur === n ? "tt-pop inline-block" : ""}>
+                ★
+              </span>
+            </button>
+          ))}
+        </div>
+        <EndLabels minLabel={minLabel} maxLabel={maxLabel} />
       </div>
     );
   }
   if (q.type === "scale") {
     return (
-      <div className="flex gap-1.5">
-        {[1, 2, 3, 4, 5].map((n) => (
-          <button
-            key={n}
-            type="button"
-            onClick={() => onChange(String(n))}
-            className={cx(
-              "h-9 w-9 rounded-md border text-sm font-medium transition-colors",
-              value === String(n)
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-input hover:bg-accent"
-            )}
-          >
-            {n}
-          </button>
-        ))}
+      <div>
+        <div className="grid grid-cols-5 gap-2">
+          {[1, 2, 3, 4, 5].map((n) => (
+            <button
+              key={n}
+              type="button"
+              onClick={() => onChange(String(n))}
+              className={cx(
+                "tt-press h-11 rounded-lg border text-sm font-semibold transition-colors",
+                value === String(n)
+                  ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                  : "border-input hover:border-primary/50 hover:bg-accent"
+              )}
+            >
+              {n}
+            </button>
+          ))}
+        </div>
+        <EndLabels minLabel={minLabel} maxLabel={maxLabel} />
       </div>
     );
   }
