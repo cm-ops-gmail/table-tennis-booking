@@ -95,24 +95,24 @@ export function EmployeePicker({
                 <button
                   type="button"
                   disabled={owes}
-                  title={owes ? `${e.name} owes feedback on a past match — can't be added yet.` : undefined}
                   onMouseDown={(ev) => ev.preventDefault()}
                   onClick={() => !owes && add(e.employeeId)}
                   className={cx(
-                    "flex w-full items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-left text-sm",
-                    owes ? "cursor-not-allowed opacity-55" : "hover:bg-accent"
+                    "w-full rounded-sm px-2 py-1.5 text-left text-sm",
+                    owes ? "cursor-not-allowed" : "hover:bg-accent"
                   )}
                 >
-                  <span className="min-w-0 truncate">
-                    <span className="font-medium">{e.name}</span>{" "}
-                    <span className="text-muted-foreground">· {e.department || "—"}</span>
-                  </span>
-                  {owes ? (
-                    <span className="shrink-0 rounded-full bg-[color:var(--warning)]/15 px-1.5 py-0.5 text-[10px] font-medium text-[color:var(--warning)]">
-                      feedback pending
+                  <div className={cx("flex items-center justify-between gap-2", owes && "opacity-55")}>
+                    <span className="min-w-0 truncate">
+                      <span className="font-medium">{e.name}</span>{" "}
+                      <span className="text-muted-foreground">· {e.department || "—"}</span>
                     </span>
-                  ) : (
                     <span className="shrink-0 text-xs text-muted-foreground">{e.employeeId}</span>
+                  </div>
+                  {owes && (
+                    <div className="mt-0.5 text-xs leading-snug text-[color:var(--warning)]">
+                      Hasn&apos;t given feedback on their previous match — they need to do that before you can add them.
+                    </div>
                   )}
                 </button>
               </li>

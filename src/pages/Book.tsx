@@ -262,7 +262,7 @@ export default function Book() {
           <div className="text-sm">
             <span className="font-semibold">Feedback pending.</span>{" "}
             <span className="text-muted-foreground">
-              You have a past match you haven&apos;t rated. Submit that feedback to unlock booking again.
+              You have a previous match you haven&apos;t rated. Give feedback on it to book new slots.
             </span>
           </div>
           <Link
@@ -423,8 +423,8 @@ export default function Book() {
 
                     <div className="mt-auto pt-1">
                       {avail && iOweFeedback && (
-                        <div className="h-8 rounded-md bg-secondary/60 text-center text-xs leading-8 text-muted-foreground">
-                          Submit your feedback first
+                        <div className="rounded-md bg-secondary/60 px-2 py-1.5 text-center text-xs leading-snug text-muted-foreground">
+                          Give feedback on your previous match to book a new slot
                         </div>
                       )}
                       {avail && !iOweFeedback && (
