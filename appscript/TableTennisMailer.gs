@@ -199,8 +199,11 @@ function sendFeedbackReminders_() {
     if (String(row["Status"] || "").trim() !== "Confirmed") continue;
     if (String(row["Feedback Reminder Sent"] || "").trim().toUpperCase() === "TRUE") continue;
 
-    const date = String(row["Date"] || "").trim();
-    const endTime = String(row["End Time"] || "").trim();
+    // Normalise in case the Date / End Time columns are formatted as
+    // Date/Time in the sheet (getValues() then hands us a Date object, and
+    // "2026-09-12" < "Fri Sep 12 ..." string compares wrong).
+    const date = ttNormDate_(row["Date"]);
+    const endTime = ttNormTime_(row["End Time"]);
     if (!date || !endTime) continue;
     const played = date < today || (date === today && nowHHMM >= endTime);
     if (!played) continue;
@@ -214,7 +217,7 @@ function sendFeedbackReminders_() {
         MailApp.sendEmail({
           to: emails[i],
           subject: "How was your Table Tennis match? Feedback needed — " + row["Slot Label"],
-          htmlBody: renderFeedbackReminderEmail_(names[i] || "there", row),
+          htmlBody: renderFeedbackReminderEmail_(names[i] || "there", row, date),
           name: TT_BRAND,
         });
       } catch (err) {
@@ -257,6 +260,46 @@ function splitList_(s) {
   return String(s || "")
     .split(",")
     .map((x) => x.trim());
+}
+
+/** Whatever the "Date" cell yields → "yyyy-MM-dd" (handles a Date object,
+ *  a sheet serial, m/d/yyyy, d-MMM-yyyy, or an already-clean ISO string). */
+function ttNormDate_(v) {
+  if (v instanceof Date && !isNaN(v)) return Utilities.formatDate(v, TT_TIMEZONE, "yyyy-MM-dd");
+  var s = String(v == null ? "" : v).trim();
+  if (!s) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  var iso = s.match(/^(\d{4})-(\d{2})-(\d{2})[T ]/);
+  if (iso) return iso[1] + "-" + iso[2] + "-" + iso[3];
+  if (/^\d{4,6}(\.\d+)?$/.test(s)) {
+    var n = Number(s);
+    if (n > 20000 && n < 90000) {
+      return Utilities.formatDate(new Date(Math.round((n - 25569) * 86400000)), "UTC", "yyyy-MM-dd");
+    }
+  }
+  var d = new Date(s);
+  return isNaN(d) ? s : Utilities.formatDate(d, TT_TIMEZONE, "yyyy-MM-dd");
+}
+
+/** Whatever the "End Time" cell yields → 24h "HH:mm". */
+function ttNormTime_(v) {
+  if (v instanceof Date && !isNaN(v)) return Utilities.formatDate(v, TT_TIMEZONE, "HH:mm");
+  var s = String(v == null ? "" : v).trim();
+  if (!s) return "";
+  if (/^\d{2}:\d{2}$/.test(s)) return s;
+  var ap = s.match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*([AaPp][Mm])$/);
+  if (ap) {
+    var h = Number(ap[1]) % 12;
+    if (/p/i.test(ap[3])) h += 12;
+    return ("0" + h).slice(-2) + ":" + ap[2];
+  }
+  var hm = s.match(/^(\d{1,2}):(\d{2})/);
+  if (hm) return ("0" + hm[1]).slice(-2) + ":" + hm[2];
+  if (/^0?\.\d+$/.test(s)) {
+    var mins = Math.round(Number(s) * 1440);
+    return ("0" + Math.floor(mins / 60)).slice(-2) + ":" + ("0" + (mins % 60)).slice(-2);
+  }
+  return s;
 }
 
 /* ------------------------------------------------------------------ *
@@ -372,13 +415,13 @@ function renderNotificationEmail_(row) {
   return emailShell_(String(row["Subject"] || "Table Tennis Booking"), badge + "<br>" + greet + bodyToHtml_(row["Body"]) + cta);
 }
 
-function renderFeedbackReminderEmail_(name, bookingRow) {
+function renderFeedbackReminderEmail_(name, bookingRow, dateStr) {
   const body =
     '<p style="margin:0 0 12px;font-size:14px;color:#333;">Hi ' +
     escapeHtml_(name) +
     ",</p>" +
     '<p style="margin:0 0 12px;font-size:14px;color:#333;line-height:1.6;">Hope you enjoyed your match! Your Table Tennis game on <strong>' +
-    escapeHtml_(bookingRow["Date"]) +
+    escapeHtml_(dateStr || bookingRow["Date"]) +
     "</strong> at <strong>" +
     escapeHtml_(bookingRow["Slot Label"]) +
     "</strong> has wrapped up — we'd love a minute of your feedback.</p>" +
