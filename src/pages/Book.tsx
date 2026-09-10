@@ -360,15 +360,15 @@ export default function Book() {
                               <span
                                 key={p.employeeId + k}
                                 className={cx(
-                                  "tt-chip-pop inline-flex items-center gap-1 rounded-full border px-2.5 py-1 font-mono text-xs",
+                                  "tt-chip-pop inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs",
                                   isOwner
                                     ? "border-[color:var(--info)]/40 bg-[color:var(--info)]/10 text-[color:var(--info)]"
                                     : "border-border bg-card text-foreground"
                                 )}
                                 style={{ animationDelay: `${k * 45}ms` }}
-                                title={p.employeeId}
+                                title={`${p.name} · ${p.employeeId}`}
                               >
-                                {p.employeeId}
+                                {p.name}
                                 {isOwner && <span className="text-[10px]">👑</span>}
                               </span>
                             );

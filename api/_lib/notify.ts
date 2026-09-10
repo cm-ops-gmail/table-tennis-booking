@@ -2,6 +2,7 @@ import { appendRows } from "./sheets.js";
 import { TAB } from "./schema.js";
 import { genId, nowIso } from "./util.js";
 import { getHrRecipient } from "./config.js";
+import { listEmployees } from "./employees.js";
 import type { Booking } from "../../src/shared/types.js";
 import type { Employee } from "../../src/shared/types.js";
 
@@ -148,7 +149,11 @@ export async function queueBookingNotifications(
   }
 
   // Line manager of each participant — grouped by manager email, so two
-  // reports on the same booking get ONE email naming both.
+  // reports on the same booking get ONE email naming both. The roster only
+  // has the manager's email (no "Line Manager Name" column), so resolve the
+  // manager's own name from their employee record for the greeting.
+  const roster = await listEmployees();
+  const nameByEmail = new Map(roster.filter((e) => e.email).map((e) => [e.email.toLowerCase(), e.name]));
   const byManager = new Map<
     string,
     { name: string; email: string; people: { name: string; employeeId: string }[] }
@@ -158,7 +163,7 @@ export async function queueBookingNotifications(
     if (!mgr?.lineManagerEmail) continue;
     const key = mgr.lineManagerEmail.toLowerCase();
     const cur = byManager.get(key) || {
-      name: mgr.lineManagerName || "Line Manager",
+      name: mgr.lineManagerName || nameByEmail.get(key) || "there",
       email: mgr.lineManagerEmail,
       people: [] as { name: string; employeeId: string }[],
     };
