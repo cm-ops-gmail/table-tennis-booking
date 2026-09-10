@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 export function cx(...parts: (string | false | null | undefined)[]) {
   return parts.filter(Boolean).join(" ");
@@ -262,7 +263,11 @@ export function Dialog({
     };
   }, [open, onClose]);
   if (!open) return null;
-  return (
+  // Portal to <body>: an ancestor with an animated `transform` (our
+  // .tt-rise on <main>, fill-mode both) becomes the containing block for
+  // `position: fixed`, which would pin the modal to the scrolling page
+  // instead of the viewport. Rendering on <body> sidesteps that entirely.
+  return createPortal(
     // Scroll container and flex-centering must be on SEPARATE elements — put
     // both on one and a modal taller than the viewport gets pushed
     // off-screen (its top becomes unreachable). Mobile top-aligns so a long
@@ -296,7 +301,8 @@ export function Dialog({
           {footer && <div className="mt-6 flex flex-wrap justify-end gap-2">{footer}</div>}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
