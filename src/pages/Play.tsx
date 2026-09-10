@@ -33,9 +33,9 @@ const COS_P = Math.cos(PITCH);
 
 type Diff = "easy" | "normal" | "hard";
 const AI: Record<Diff, { speed: number; reachX: number; reachY: number; err: number; react: number }> = {
-  easy: { speed: 2.6, reachX: 0.95, reachY: 0.8, err: 0.9, react: NET_Z + 1.6 },
-  normal: { speed: 3.7, reachX: 1.05, reachY: 0.9, err: 0.5, react: NET_Z + 0.4 },
-  hard: { speed: 5.0, reachX: 1.2, reachY: 1.0, err: 0.2, react: NET_Z - 0.6 },
+  easy: { speed: 2.6, reachX: 0.5, reachY: 0.46, err: 0.9, react: NET_Z + 1.6 },
+  normal: { speed: 3.7, reachX: 0.42, reachY: 0.4, err: 0.5, react: NET_Z + 0.4 },
+  hard: { speed: 5.0, reachX: 0.4, reachY: 0.38, err: 0.2, react: NET_Z - 0.6 },
 };
 
 interface V3 {
@@ -274,13 +274,15 @@ export default function Play() {
         }
 
         /* ---- player strike ---- */
+        // Hit box roughly matches the drawn blade (a little forgiving, not
+        // the old ~9x-oversized zone that "hit" balls flying past the bat).
         if (
           st.canHit &&
           st.vel.z < 0 &&
-          st.ball.z < st.pPad.z + 0.55 &&
-          st.ball.z > st.pPad.z - 0.6 &&
-          Math.abs(st.ball.x - st.pPad.x) < 0.9 &&
-          Math.abs(st.ball.y - st.pPad.y) < 0.75
+          st.ball.z < st.pPad.z + 0.38 &&
+          st.ball.z > st.pPad.z - 0.42 &&
+          Math.abs(st.ball.x - st.pPad.x) < 0.34 &&
+          Math.abs(st.ball.y - st.pPad.y) < 0.34
         ) {
           const tz = NET_Z + (FAR_Z - NET_Z) * (0.35 + Math.random() * 0.5);
           const tx = Math.max(-TABLE_HW * 0.9, Math.min(TABLE_HW * 0.9, st.pPad.x * 0.55 + (Math.random() * 0.5 - 0.25)));
@@ -467,8 +469,10 @@ export default function Play() {
       // --- paddles ---
       const pad = (p: V3, col: string) => {
         const c = project(p.x, p.y, p.z);
-        const w = Math.min(26, Math.max(5, 0.1 * c.s));
-        const h = w * 1.3;
+        // Blade drawn close to the actual hit box so a "hit" always looks
+        // like contact.
+        const w = Math.min(32, Math.max(6, 0.15 * c.s));
+        const h = w * 1.25;
         // handle
         ctx.strokeStyle = "rgba(90,70,55,0.9)";
         ctx.lineWidth = Math.max(2, w * 0.32);
