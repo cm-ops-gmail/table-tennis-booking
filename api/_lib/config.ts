@@ -52,11 +52,16 @@ async function sheetValues(): Promise<Map<string, string>> {
 }
 
 function pick(sheet: Map<string, string>, key: string, envFallback: string | undefined, hardDefault: string): string {
-  const fromSheet = sheet.get(key);
-  if (fromSheet) return fromSheet;
+  // A key that's present in the Config tab is authoritative — even when
+  // blank. Clearing a field in the Settings UI / sheet (e.g. HR_ADMIN_EMAIL
+  // to stop the HR notifications) must actually take effect, not silently
+  // fall back to an env var. Env vars only fill in keys the sheet lacks.
+  if (sheet.has(key)) return sheet.get(key)!;
   if (envFallback) return envFallback;
   return hardDefault;
 }
+
+const HHMM = /^([01]?\d|2[0-3]):[0-5]\d$/;
 
 export async function getConfig(): Promise<AppConfig> {
   const sheet = await sheetValues();
@@ -71,8 +76,12 @@ export async function getConfig(): Promise<AppConfig> {
     hrName: pick(sheet, "HR_ADMIN_NAME", process.env.HR_ADMIN_NAME, "HR Admin").trim(),
     horizonDays: Number.isFinite(horizon) && horizon > 0 ? horizon : 14,
     allowRatingEdit: pick(sheet, "ALLOW_RATING_EDIT", process.env.ALLOW_RATING_EDIT, "TRUE").toLowerCase() !== "false",
-    facilityStart: pick(sheet, "FACILITY_START", process.env.FACILITY_START, "13:00"),
-    facilityEnd: pick(sheet, "FACILITY_END", process.env.FACILITY_END, "17:30"),
+    facilityStart: HHMM.test(pick(sheet, "FACILITY_START", process.env.FACILITY_START, "13:00").trim())
+      ? pick(sheet, "FACILITY_START", process.env.FACILITY_START, "13:00").trim()
+      : "13:00",
+    facilityEnd: HHMM.test(pick(sheet, "FACILITY_END", process.env.FACILITY_END, "17:30").trim())
+      ? pick(sheet, "FACILITY_END", process.env.FACILITY_END, "17:30").trim()
+      : "17:30",
     matchMinutes: Number.isFinite(matchMinutes) && matchMinutes > 0 ? matchMinutes : 30,
     gapMinutes: Number.isFinite(gapMinutes) && gapMinutes >= 0 ? gapMinutes : 10,
     slotCount: Number.isFinite(slotCount) && slotCount > 0 ? slotCount : 7,

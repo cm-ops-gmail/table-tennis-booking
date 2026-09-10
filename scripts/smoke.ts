@@ -62,6 +62,21 @@ async function main() {
   try {
     const date = futureDate(2);
 
+    // The Config tab is authoritative now (a present key wins over the env
+    // var, even when blank), so seed ADMIN_EMAILS into the in-memory tab
+    // rather than relying on process.env.ADMIN_EMAILS alone.
+    {
+      const mem = await import("../api/_lib/memstore");
+      mem.memSeed();
+      const c = mem.memReadTable("Config");
+      const seedCfg = (key: string, value: string) => {
+        const i = c.rows.findIndex((r) => r["Key"] === key);
+        if (i >= 0) mem.memPatchCells("Config", c.rowNumbers[i], { Value: value });
+      };
+      seedCfg("ADMIN_EMAILS", ADMIN_EMAIL);
+      seedCfg("HR_ADMIN_EMAIL", process.env.HR_ADMIN_EMAIL || "hr@10ms.test");
+    }
+
     console.log("\nconfig / identity");
     const cfg = await call("/config");
     ok("config returns 7 slots", cfg.body.slots?.length === 7);
@@ -438,6 +453,18 @@ async function main() {
     setConfigValue("FACILITY_START", "13:00");
     const restoredCfg = await call("/config");
     ok("config reverts cleanly once the sheet values are restored", restoredCfg.body.slots.length === 7);
+
+    // Clearing HR_ADMIN_EMAIL in the Config tab must stop the HR emails,
+    // even though process.env.HR_ADMIN_EMAIL is still set.
+    setConfigValue("HR_ADMIN_EMAIL", "");
+    const bkNoHr = await call("/bookings", { body: { ownerId: "E3", participantIds: ["E4"], date: futureDate(9), slotId: 2 } });
+    ok("booking still works with HR email cleared", bkNoHr.status === 201, JSON.stringify(bkNoHr.body));
+    const notif2 = (await import("../api/_lib/memstore")).memReadTable("Notifications");
+    const hrRows = notif2.rows.filter(
+      (r: any) => r["Booking ID"] === bkNoHr.body.booking?.bookingId && r["Recipient Role"] === "hr_admin"
+    );
+    ok("no HR notification is queued when HR_ADMIN_EMAIL is blank", hrRows.length === 0, JSON.stringify(hrRows));
+    setConfigValue("HR_ADMIN_EMAIL", process.env.HR_ADMIN_EMAIL || "hr@10ms.test");
 
     console.log("\nadmin: edit the Config tab in-app");
     const cfgRows = await call("/admin/config", { admin: true });
