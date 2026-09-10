@@ -355,24 +355,6 @@ function ctaButton_(url, label) {
   );
 }
 
-function badge_(label, tone) {
-  const palette =
-    tone === "danger"
-      ? { bg: "#fdeceb", fg: "#b3261e" }
-      : tone === "warn"
-      ? { bg: "#fff8e1", fg: "#8a5a00" }
-      : { bg: "#e6f4ea", fg: "#1a7f37" };
-  return (
-    '<span style="display:inline-block;padding:4px 12px;border-radius:999px;background:' +
-    palette.bg +
-    ";color:" +
-    palette.fg +
-    ';font-size:12px;font-weight:600;margin-bottom:16px;">' +
-    escapeHtml_(label) +
-    "</span>"
-  );
-}
-
 /** The shared branded card every email is wrapped in. */
 function emailShell_(title, innerHtml, footerNote) {
   return (
@@ -401,18 +383,15 @@ function emailShell_(title, innerHtml, footerNote) {
 }
 
 function renderNotificationEmail_(row) {
-  const type = String(row["Type"] || "");
-  const isCancel = type === "booking_cancelled";
-  const badge = isCancel ? badge_("Cancelled", "danger") : badge_("Confirmed", "success");
-  const greet =
-    '<p style="margin:0 0 4px;font-size:14px;color:#333;">Hi ' +
-    escapeHtml_(row["Recipient Name"] || "there") +
-    ",</p>";
+  // The Body (authored by the app, incl. the "Hi <name>," greeting) carries
+  // the whole message now; we just format it into the branded shell and add
+  // a "View my bookings" button for a fresh confirmation.
+  const isCancel = String(row["Type"] || "") === "booking_cancelled";
   const cta =
     !isCancel && row["Recipient Role"] === "participant"
       ? ctaButton_(TT_APP_URL + "/my-bookings", "View my bookings")
       : "";
-  return emailShell_(String(row["Subject"] || "Table Tennis Booking"), badge + "<br>" + greet + bodyToHtml_(row["Body"]) + cta);
+  return emailShell_(String(row["Subject"] || "Table Tennis Booking"), bodyToHtml_(row["Body"]) + cta);
 }
 
 function renderFeedbackReminderEmail_(name, bookingRow, dateStr) {

@@ -25,6 +25,92 @@ function fmtPlayers(b: Booking): string {
   return b.participants.map((p) => `${p.name} (${p.employeeId})${p.isOwner ? " — owner" : ""}`).join(", ");
 }
 
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+/** "2026-09-10" → "10 Sep" for the cancellation subject lines. */
+function shortDate(ymd: string): string {
+  const m = ymd.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return ymd;
+  return `${Number(m[3])} ${MONTHS[Number(m[2]) - 1] || m[2]}`;
+}
+
+/** The shared "Date / Time / Players / Owner / ID" block. */
+function detailsBlock(b: Booking, opts: { employeeLine?: string } = {}): string {
+  return [
+    opts.employeeLine ? `Employee: ${opts.employeeLine}` : "",
+    `Booking Date: ${b.date}`,
+    `Match Time: ${b.slotLabel}`,
+    `All Players: ${fmtPlayers(b)}`,
+    `Booking Owner: ${b.ownerName}`,
+    `Booking ID: ${b.bookingId}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+/* ------------------------------------------------------------------ *
+ * Per-recipient copy. Each returns { subject, body }. The Apps Script
+ * wraps the body in the branded HTML shell (Subject becomes the heading).
+ * ------------------------------------------------------------------ */
+
+function participantConfirmed(b: Booking, name: string) {
+  return {
+    subject: "🏓 Game On! Your Table Tennis Match Is Confirmed",
+    body:
+      `Hi ${name},\n\n` +
+      `Your Table Tennis match is officially booked! 🏓🔥\n\n` +
+      `Booking Date: ${b.date}\n` +
+      `Match Time: ${b.slotLabel}\n` +
+      `All Players: ${fmtPlayers(b)}\n` +
+      `Booking ID: ${b.bookingId}\n\n` +
+      `Time to bring your A-game. 😎\n\n` +
+      `Happy playing!`,
+  };
+}
+
+function participantCancelled(b: Booking, name: string) {
+  return {
+    subject: `🏓 Table Tennis Booking Cancelled — ${shortDate(b.date)}, ${b.slotLabel}`,
+    body:
+      `Hi ${name},\n\n` +
+      `Just a quick heads-up — your Table Tennis match has been cancelled. 🏓\n\n` +
+      `${detailsBlock(b)}\n\n` +
+      `Catch you on the next game! 😎`,
+  };
+}
+
+function managerConfirmed(b: Booking, managerName: string, employees: string, multi: boolean) {
+  return {
+    subject: `🏓 Table Tennis Booking — Your Team Member${multi ? "s Are" : " Is"} In!`,
+    body:
+      `Hi ${managerName},\n\n` +
+      `${multi ? "Some of your team members have" : "One of your team members has"} booked a Table Tennis slot for some recreation time! 🏓✨\n\n` +
+      `${detailsBlock(b, { employeeLine: employees })}\n\n` +
+      `Just a quick heads-up so you're in the loop. 😊\n\n` +
+      `Happy playing!`,
+  };
+}
+
+function managerCancelled(b: Booking, managerName: string, employees: string, multi: boolean) {
+  return {
+    subject: `🏓 Table Tennis Booking Cancelled — ${employees}`,
+    body:
+      `Hi ${managerName},\n\n` +
+      `Just a quick heads-up — your team member${multi ? "s'" : "'s"} Table Tennis booking has been cancelled. 🏓\n\n` +
+      `${detailsBlock(b, { employeeLine: employees })}\n\n` +
+      `You're all set for now.`,
+  };
+}
+
+function hrCopy(b: Booking, verb: string) {
+  return {
+    subject: `[HR] Table Tennis booking ${verb} — ${b.date} ${b.slotLabel}`,
+    body:
+      `A Table Tennis booking has been ${verb}.\n\n` +
+      `${detailsBlock(b)}` +
+      (verb === "cancelled" && b.cancelledBy ? `\nCancelled by: ${b.cancelledBy}` : ""),
+  };
+}
+
 /**
  * Queue all notifications for a booking event. Rows land in the Notifications
  * tab with Status = "Pending"; the spreadsheet's Apps Script sends the mail.
@@ -35,7 +121,7 @@ export async function queueBookingNotifications(
   managers: Pick<Employee, "employeeId" | "name" | "lineManagerName" | "lineManagerEmail">[]
 ): Promise<void> {
   const hr = await getHrRecipient();
-  const verb = type === "booking_created" ? "confirmed" : "cancelled";
+  const created = type === "booking_created";
   const rows: OutboxRow[] = [];
 
   const base = {
@@ -46,27 +132,23 @@ export async function queueBookingNotifications(
     Status: "Pending" as const,
   };
 
-  // 11.1 — participating employees
+  // Participating employees
   for (const p of b.participants) {
     if (!p.email) continue;
+    const { subject, body } = created ? participantConfirmed(b, p.name) : participantCancelled(b, p.name);
     rows.push({
       ...base,
       "Notification ID": genId("NTF"),
       "Recipient Role": "participant",
       "Recipient Name": p.name,
       "Recipient Email": p.email,
-      Subject: `Table Tennis booking ${verb} — ${b.date} ${b.slotLabel}`,
-      Body:
-        `Your Table Tennis match has been ${verb}.\n\n` +
-        `Date: ${b.date}\nTime: ${b.slotLabel}\nBooking Owner: ${b.ownerName}\n` +
-        `Players: ${fmtPlayers(b)}\nBooking ID: ${b.bookingId}` +
-        (type === "booking_cancelled" && b.cancelledBy ? `\nCancelled by: ${b.cancelledBy}` : ""),
+      Subject: subject,
+      Body: body,
     });
   }
 
-  // 11.2 — line manager of each participant. Grouped by manager email, not
-  // by employee: two participants who share a manager produce ONE email
-  // naming both of them, not two separate emails.
+  // Line manager of each participant — grouped by manager email, so two
+  // reports on the same booking get ONE email naming both.
   const byManager = new Map<
     string,
     { name: string; email: string; people: { name: string; employeeId: string }[] }
@@ -85,38 +167,32 @@ export async function queueBookingNotifications(
   }
   for (const mgr of byManager.values()) {
     const multi = mgr.people.length > 1;
-    const names = mgr.people.map((x) => `${x.name} (${x.employeeId})`).join(", ");
+    const employees = mgr.people.map((x) => `${x.name} (${x.employeeId})`).join(", ");
+    const { subject, body } = created
+      ? managerConfirmed(b, mgr.name, employees, multi)
+      : managerCancelled(b, mgr.name, employees, multi);
     rows.push({
       ...base,
       "Notification ID": genId("NTF"),
       "Recipient Role": "line_manager",
       "Recipient Name": mgr.name,
       "Recipient Email": mgr.email,
-      Subject: `Team member${multi ? "s'" : "'s"} Table Tennis booking ${verb} — ${names}`,
-      Body:
-        `This is to inform you that ${multi ? "your team members'" : "a team member's"} Table Tennis booking has been ${verb}.\n\n` +
-        `${multi ? "Employees" : "Employee"}: ${names}\n` +
-        `Booking Date: ${b.date}\nMatch Time: ${b.slotLabel}\n` +
-        `All Players: ${fmtPlayers(b)}\n` +
-        `Booking Owner: ${b.ownerName}\nBooking ID: ${b.bookingId}`,
+      Subject: subject,
+      Body: body,
     });
   }
 
-  // 11.3 — HR Admin
+  // HR (only if HR_ADMIN_EMAIL is set in the Config tab)
   if (hr.email) {
+    const { subject, body } = hrCopy(b, created ? "confirmed" : "cancelled");
     rows.push({
       ...base,
       "Notification ID": genId("NTF"),
       "Recipient Role": "hr_admin",
       "Recipient Name": hr.name,
       "Recipient Email": hr.email,
-      Subject: `[HR] Table Tennis booking ${verb} — ${b.date} ${b.slotLabel}`,
-      Body:
-        `A Table Tennis booking has been ${verb}.\n\n` +
-        `Booking Owner: ${b.ownerName} (${b.ownerId})\n` +
-        `Participating Employees: ${fmtPlayers(b)}\n` +
-        `Booking Date: ${b.date}\nBooking Slot: ${b.slotLabel}\nBooking ID: ${b.bookingId}` +
-        (type === "booking_cancelled" && b.cancelledBy ? `\nCancelled by: ${b.cancelledBy}` : ""),
+      Subject: subject,
+      Body: body,
     });
   }
 
