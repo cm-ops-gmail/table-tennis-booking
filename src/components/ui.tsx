@@ -263,32 +263,38 @@ export function Dialog({
   }, [open, onClose]);
   if (!open) return null;
   return (
-    <div
-      className="tt-overlay-in fixed inset-0 z-50 flex min-h-full items-center justify-center overflow-y-auto bg-black/45 p-4 py-8 backdrop-blur-[2px]"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
+    // Scroll container and flex-centering must be on SEPARATE elements — put
+    // both on one and a modal taller than the viewport gets pushed
+    // off-screen (its top becomes unreachable). Mobile top-aligns so a long
+    // form always scrolls from the top; desktop centers.
+    <div className="tt-overlay-in fixed inset-0 z-50 overflow-y-auto bg-black/45 backdrop-blur-[2px]">
       <div
-        className={cx(
-          "tt-modal-in relative my-auto w-full rounded-2xl border border-border bg-card p-5 shadow-2xl",
-          wide ? "max-w-2xl" : "max-w-md"
-        )}
-        role="dialog"
-        aria-modal="true"
-        style={{ willChange: "transform, opacity" }}
+        className="flex min-h-full items-start justify-center p-3 py-6 sm:items-center sm:p-4 sm:py-10"
+        onMouseDown={(e) => {
+          if (e.target === e.currentTarget) onClose();
+        }}
       >
-        <button
-          onClick={onClose}
-          className="tt-press absolute right-3.5 top-3.5 grid h-7 w-7 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-          aria-label="Close"
+        <div
+          className={cx(
+            "tt-modal-in relative w-full rounded-2xl border border-border bg-card p-4 shadow-2xl sm:p-5",
+            wide ? "max-w-2xl" : "max-w-md"
+          )}
+          role="dialog"
+          aria-modal="true"
+          style={{ willChange: "transform, opacity" }}
         >
-          ✕
-        </button>
-        <h2 className="pr-8 text-lg font-semibold">{title}</h2>
-        {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
-        <div className="mt-4">{children}</div>
-        {footer && <div className="mt-6 flex justify-end gap-2">{footer}</div>}
+          <button
+            onClick={onClose}
+            className="tt-press absolute right-3.5 top-3.5 grid h-7 w-7 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            aria-label="Close"
+          >
+            ✕
+          </button>
+          <h2 className="pr-8 text-lg font-semibold">{title}</h2>
+          {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
+          <div className="mt-4">{children}</div>
+          {footer && <div className="mt-6 flex flex-wrap justify-end gap-2">{footer}</div>}
+        </div>
       </div>
     </div>
   );
