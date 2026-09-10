@@ -73,6 +73,10 @@ function Shell({ children }: { children: React.ReactNode }) {
   const employee = useEmployee();
   const isAdmin = useIsAdmin();
   const location = useLocation();
+  const { refresh } = useTenMSAuth();
+  const [menuOpen, setMenuOpen] = useState(false);
+  useEffect(() => setMenuOpen(false), [location.pathname]);
+  const initials = employee?.name.split(" ").map((w) => w[0]).slice(0, 2).join("") ?? "";
   // Operating hours are set in the sheet's Config tab now, not hardcoded —
   // fetch once so the footer never drifts from the real slot timing.
   const [hours, setHours] = useState<{ start: string; end: string } | null>(null);
@@ -131,20 +135,74 @@ function Shell({ children }: { children: React.ReactNode }) {
               </Link>
             )}
             <ThemeToggle />
+
+            {/* Desktop: name + avatar + sign out */}
             {employee && (
-              <div className="flex items-center gap-2">
-                <div className="hidden text-right sm:block">
+              <div className="hidden items-center gap-2 sm:flex">
+                <div className="text-right">
                   <div className="text-sm font-medium leading-tight">{employee.name}</div>
                   <div className="text-xs leading-tight text-muted-foreground">
                     {employee.department || employee.employeeId}
                   </div>
                 </div>
-                <span className="hidden h-8 w-8 place-items-center rounded-full bg-primary text-xs font-semibold text-primary-foreground sm:grid">
-                  {employee.name.split(" ").map((w) => w[0]).slice(0, 2).join("")}
+                <span className="grid h-8 w-8 place-items-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+                  {initials}
                 </span>
                 <SignOutButton />
               </div>
             )}
+
+            {/* Mobile: hamburger holding what the top bar can't fit */}
+            <div className="relative sm:hidden">
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Menu"
+                aria-expanded={menuOpen}
+                onClick={() => setMenuOpen((o) => !o)}
+              >
+                <span className="text-lg leading-none">{menuOpen ? "✕" : "☰"}</span>
+              </Button>
+              {menuOpen && (
+                <>
+                  <div className="fixed inset-0 z-40" aria-hidden onClick={() => setMenuOpen(false)} />
+                  <div className="absolute right-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-xl border border-border bg-background p-1.5 shadow-lg">
+                    {employee && (
+                      <div className="flex items-center gap-2 px-2 py-2">
+                        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+                          {initials}
+                        </span>
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-medium leading-tight">{employee.name}</div>
+                          <div className="truncate text-xs leading-tight text-muted-foreground">
+                            {employee.department || employee.employeeId}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    {isAdmin && (
+                      <Link
+                        to="/admin"
+                        className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium no-underline transition-colors hover:bg-accent"
+                      >
+                        🛠️ Admin view
+                      </Link>
+                    )}
+                    <div className="my-1 h-px bg-border" />
+                    <button
+                      onClick={async () => {
+                        setMenuOpen(false);
+                        await signOut();
+                        refresh();
+                      }}
+                      className="w-full rounded-lg px-2 py-2 text-left text-sm font-medium text-destructive transition-colors hover:bg-accent"
+                    >
+                      Sign out
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </header>
