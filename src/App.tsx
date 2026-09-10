@@ -9,6 +9,7 @@ import {
   initTheme,
   isDark,
   toggleTheme,
+  getEmployee,
   useEmployee,
   useIsAdmin,
   resolveIdentity,
@@ -245,17 +246,34 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const [phase, setPhase] = useState<"idle" | "resolving" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
 
+  // Re-check the identity against /auth/sso once per signed-in account (the
+  // primitive `sub` dep means this fires on login, not on every render).
+  // If there's already a cached employee we don't block on it — the store
+  // update just refreshes name / admin status live — but if the server now
+  // rejects us (removed from the roster, token dead) we sign out.
+  const userKey = user?.sub ?? null;
   useEffect(() => {
-    if (loading || !user || employee || phase === "resolving" || phase === "error") return;
-    setPhase("resolving");
+    if (loading || !userKey) return;
+    let alive = true;
+    const hadCache = !!getEmployee();
+    if (!hadCache) setPhase("resolving");
     resolveIdentity().then((r) => {
+      if (!alive) return;
       if (r.ok) setPhase("idle");
-      else {
+      else if (!hadCache) {
         setErrorMsg(r.error);
         setPhase("error");
+      } else {
+        void signOut().then(() => refresh());
       }
     });
-  }, [loading, user, employee, phase]);
+    return () => {
+      alive = false;
+    };
+    // `refresh` is only touched in the reject branch; excluded so an
+    // unstable identity from the provider can't re-trigger the check.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, userKey]);
 
   async function doLogout() {
     await signOut();
