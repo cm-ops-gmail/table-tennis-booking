@@ -1,6 +1,6 @@
 import { readTable, appendRows, patchCells } from "./sheets.js";
 import { TAB } from "./schema.js";
-import { genId, nowIso, truthy, HttpError } from "./util.js";
+import { genId, nowIso, truthy, normDate, HttpError } from "./util.js";
 import { getSlots } from "./config.js";
 import type { BlockedSlot, BlockedDate, BlockedUser } from "../../src/shared/types.js";
 
@@ -15,7 +15,7 @@ export async function listBlockedSlots(): Promise<BlockedSlot[]> {
     .filter((r) => (r["Type"] || "slot").toLowerCase() === "slot")
     .map((r) => ({
       blockId: r["Block ID"],
-      date: r["Date"],
+      date: normDate(r["Date"]),
       slotId: Number(r["Slot ID"]),
       slotLabel: r["Slot Label"],
       reason: r["Reason"] || "",
@@ -29,7 +29,7 @@ export async function listBlockedDates(): Promise<BlockedDate[]> {
     .filter((r) => (r["Type"] || "").toLowerCase() === "date")
     .map((r) => ({
       blockId: r["Block ID"],
-      date: r["Date"],
+      date: normDate(r["Date"]),
       reason: r["Reason"] || "",
       createdAt: r["Created At"],
       createdBy: r["Created By"],
@@ -72,7 +72,7 @@ export async function blockSlot(
     "Created By": by,
     Active: "TRUE",
   };
-  await appendRows(TAB.Blocks, [row]);
+  await appendRows(TAB.Blocks, [row], { raw: true });
   return {
     blockId: row["Block ID"],
     date,
@@ -100,7 +100,7 @@ export async function blockDate(date: string, reason: string, by: string): Promi
     "Created By": by,
     Active: "TRUE",
   };
-  await appendRows(TAB.Blocks, [row]);
+  await appendRows(TAB.Blocks, [row], { raw: true });
   return { blockId: row["Block ID"], date, reason: reason || "", createdAt: row["Created At"], createdBy: by };
 }
 
@@ -122,7 +122,7 @@ export async function blockUser(email: string, reason: string, by: string): Prom
     "Created By": by,
     Active: "TRUE",
   };
-  await appendRows(TAB.Blocks, [row]);
+  await appendRows(TAB.Blocks, [row], { raw: true });
   return {
     blockId: row["Block ID"],
     email: normalized,

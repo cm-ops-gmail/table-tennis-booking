@@ -329,6 +329,44 @@ async function main() {
     });
     ok("booking allowed once everyone has rated their last match", unblocked.status === 201, JSON.stringify(unblocked.body));
 
+    console.log("\ndate normalisation (sheet reformatted the Date column)");
+    // A booking whose Date/times landed in the sheet in non-ISO formats
+    // (what happens when the column is formatted as Date/Time and written
+    // with USER_ENTERED). The app must still see it as 2026-09-12.
+    seedRow("Bookings", [
+      {
+        "Booking ID": "TTB-WEIRD-DATE",
+        "Created At": new Date().toISOString(),
+        Date: "9/12/2026",
+        "Slot ID": 2,
+        "Slot Label": "1:40 PM – 2:10 PM",
+        "Start Time": "1:40 PM",
+        "End Time": "2:10 PM",
+        Status: "Confirmed",
+        "Owner ID": "E5",
+        "Owner Name": "Eve Chowdhury",
+        "Owner Email": "eve@10ms.test",
+        "Player Count": 2,
+        "Participant IDs": "E5, E4",
+        "Participant Names": "Eve Chowdhury, Dan Ahmed",
+        "Participant Emails": "eve@10ms.test, dan@10ms.test",
+        "Line Manager Emails": "",
+        "Cancelled At": "",
+        "Cancelled By": "",
+        Notes: "",
+      },
+    ]);
+    const weirdAvail = await call(`/availability?date=2026-09-12&viewerId=E5`);
+    const weirdSlot = weirdAvail.body.slots.find((s: any) => s.id === 2);
+    ok("a non-ISO Date cell still marks the slot booked", weirdSlot?.status === "booked", JSON.stringify(weirdSlot));
+    const weirdDouble = await call("/bookings", {
+      body: { ownerId: "E3", participantIds: ["E1"], date: "2026-09-12", slotId: 2 },
+    });
+    ok("...and still blocks a double-booking of it (409)", weirdDouble.status === 409);
+    const weirdMine = await call(`/bookings?employeeId=E5`);
+    const weirdRow = (weirdMine.body.bookings || []).find((b: any) => b.bookingId === "TTB-WEIRD-DATE");
+    ok("...and reads back as a clean YYYY-MM-DD for the client", weirdRow?.date === "2026-09-12", JSON.stringify(weirdRow));
+
     console.log("\nadmin: blocked users");
     const blockUser = await call("/admin/blocks/user", {
       admin: true,

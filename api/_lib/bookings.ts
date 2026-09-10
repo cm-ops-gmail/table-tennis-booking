@@ -1,6 +1,6 @@
 import { readTable, appendRows, patchCells } from "./sheets.js";
 import { TAB } from "./schema.js";
-import { genId, nowIso, ymd, hhmmNow, isValidYmd, splitList, HttpError } from "./util.js";
+import { genId, nowIso, ymd, hhmmNow, isValidYmd, splitList, normDate, normTime, HttpError } from "./util.js";
 import { MIN_PLAYERS, MAX_PLAYERS } from "../../src/shared/slots.js";
 import type { Booking, BookingStatus, Participant } from "../../src/shared/types.js";
 import { resolveIds, findById, listEmployees } from "./employees.js";
@@ -22,11 +22,11 @@ function parseBooking(r: Record<string, string>): Booking {
   return {
     bookingId: r["Booking ID"],
     createdAt: r["Created At"],
-    date: r["Date"],
+    date: normDate(r["Date"]),
     slotId: Number(r["Slot ID"]),
     slotLabel: r["Slot Label"],
-    startTime: r["Start Time"],
-    endTime: r["End Time"],
+    startTime: normTime(r["Start Time"]),
+    endTime: normTime(r["End Time"]),
     status: (r["Status"] as BookingStatus) || "Confirmed",
     ownerId,
     ownerName: r["Owner Name"],
@@ -46,7 +46,7 @@ export async function listBookings(): Promise<Booking[]> {
 
 export async function bookingsForDate(date: string, fresh = false): Promise<Booking[]> {
   const t = await readTable(TAB.Bookings, { fresh });
-  return t.rows.filter((r) => r["Date"] === date).map(parseBooking);
+  return t.rows.filter((r) => normDate(r["Date"]) === date).map(parseBooking);
 }
 
 export async function getBooking(bookingId: string, fresh = false): Promise<{ booking: Booking; rowNumber: number } | null> {
@@ -246,7 +246,7 @@ export async function createBooking(input: CreateBookingInput): Promise<Booking>
     "Cancelled By": "",
     Notes: notes || "",
   };
-  await appendRows(TAB.Bookings, [bookingRow]);
+  await appendRows(TAB.Bookings, [bookingRow], { raw: true });
 
   const booking: Booking = {
     bookingId,

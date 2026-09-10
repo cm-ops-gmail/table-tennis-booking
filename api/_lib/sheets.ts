@@ -116,7 +116,11 @@ function toRowArray(headers: string[], obj: Record<string, unknown>): (string | 
   });
 }
 
-export async function appendRows(tab: string, objects: Record<string, unknown>[]): Promise<void> {
+export async function appendRows(
+  tab: string,
+  objects: Record<string, unknown>[],
+  opts: { raw?: boolean } = {}
+): Promise<void> {
   if (objects.length === 0) return;
   if (MEMORY()) return mem.memAppendRows(tab, objects);
   const table = await readTable(tab, { fresh: true });
@@ -124,7 +128,9 @@ export async function appendRows(tab: string, objects: Record<string, unknown>[]
   await client.spreadsheets.values.append({
     spreadsheetId: spreadsheetId(),
     range: `${tab}!A1`,
-    valueInputOption: "USER_ENTERED",
+    // RAW keeps ISO dates/times as literal text even if the column is
+    // formatted as a Date/Time in the sheet (USER_ENTERED would coerce them).
+    valueInputOption: opts.raw ? "RAW" : "USER_ENTERED",
     insertDataOption: "INSERT_ROWS",
     requestBody: { values: objects.map((o) => toRowArray(table.headers, o)) },
   });
