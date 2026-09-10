@@ -8,12 +8,15 @@ export function EmployeePicker({
   ownerId,
   max,
   onChange,
+  owing,
 }: {
   all: EmployeeLite[];
   selected: string[];
   ownerId: string;
   max: number;
   onChange: (ids: string[]) => void;
+  /** lower-cased ids that owe feedback and can't be added */
+  owing?: Set<string>;
 }) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
@@ -85,24 +88,36 @@ export function EmployeePicker({
 
       {open && !atMax && results.length > 0 && (
         <ul className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-md border border-border bg-popover p-1 shadow-lg">
-          {results.map((e) => (
-            <li key={e.employeeId}>
-              <button
-                type="button"
-                onMouseDown={(ev) => ev.preventDefault()}
-                onClick={() => add(e.employeeId)}
-                className={cx(
-                  "flex w-full items-center justify-between rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent"
-                )}
-              >
-                <span>
-                  <span className="font-medium">{e.name}</span>{" "}
-                  <span className="text-muted-foreground">· {e.department || "—"}</span>
-                </span>
-                <span className="text-xs text-muted-foreground">{e.employeeId}</span>
-              </button>
-            </li>
-          ))}
+          {results.map((e) => {
+            const owes = owing?.has(e.employeeId.toLowerCase());
+            return (
+              <li key={e.employeeId}>
+                <button
+                  type="button"
+                  disabled={owes}
+                  title={owes ? `${e.name} owes feedback on a past match — can't be added yet.` : undefined}
+                  onMouseDown={(ev) => ev.preventDefault()}
+                  onClick={() => !owes && add(e.employeeId)}
+                  className={cx(
+                    "flex w-full items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-left text-sm",
+                    owes ? "cursor-not-allowed opacity-55" : "hover:bg-accent"
+                  )}
+                >
+                  <span className="min-w-0 truncate">
+                    <span className="font-medium">{e.name}</span>{" "}
+                    <span className="text-muted-foreground">· {e.department || "—"}</span>
+                  </span>
+                  {owes ? (
+                    <span className="shrink-0 rounded-full bg-[color:var(--warning)]/15 px-1.5 py-0.5 text-[10px] font-medium text-[color:var(--warning)]">
+                      feedback pending
+                    </span>
+                  ) : (
+                    <span className="shrink-0 text-xs text-muted-foreground">{e.employeeId}</span>
+                  )}
+                </button>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

@@ -112,6 +112,7 @@ export default function Book() {
   const [date, setDate] = useState<string>("");
   const [day, setDay] = useState<DayAvailability | null>(null);
   const [employees, setEmployees] = useState<EmployeeLite[]>([]);
+  const [owing, setOwing] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -121,6 +122,15 @@ export default function Book() {
   const [submitting, setSubmitting] = useState(false);
   const [modalError, setModalError] = useState("");
   const [justBooked, setJustBooked] = useState<number | null>(null);
+
+  const loadOwing = useCallback(async () => {
+    try {
+      const { owing } = await api<{ owing: string[] }>("/feedback/owing");
+      setOwing(new Set(owing.map((id) => id.toLowerCase())));
+    } catch {
+      /* non-fatal — the Confirm step still enforces it */
+    }
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -134,7 +144,10 @@ export default function Book() {
         setError(e instanceof ApiError ? e.message : "Failed to load.");
       }
     })();
-  }, []);
+    loadOwing();
+  }, [loadOwing]);
+
+  const iOweFeedback = owing.has(employee.employeeId.toLowerCase());
 
   const loadDay = useCallback(
     async (d: string) => {
@@ -188,9 +201,11 @@ export default function Book() {
         desc: `${label} · ${prettyDate(date)}. Everyone's been notified.`,
       });
       await loadDay(date);
+      loadOwing();
       setTimeout(() => setJustBooked(null), 1400);
     } catch (e) {
       setModalError(e instanceof ApiError ? e.message : "Booking failed.");
+      loadOwing();
     } finally {
       setSubmitting(false);
     }
@@ -241,6 +256,23 @@ export default function Book() {
       </div>
 
       {error && <Alert tone="error">{error}</Alert>}
+
+      {iOweFeedback && (
+        <div className="tt-rise flex flex-col gap-2 rounded-xl border border-[color:var(--warning)]/40 bg-[color:var(--warning)]/10 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-sm">
+            <span className="font-semibold">Feedback pending.</span>{" "}
+            <span className="text-muted-foreground">
+              You have a past match you haven&apos;t rated. Submit that feedback to unlock booking again.
+            </span>
+          </div>
+          <Link
+            to="/rate"
+            className="shrink-0 self-start rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground no-underline sm:self-auto"
+          >
+            Give feedback →
+          </Link>
+        </div>
+      )}
 
       <Card>
         <CardContent className="pt-5">
@@ -390,7 +422,12 @@ export default function Book() {
                     )}
 
                     <div className="mt-auto pt-1">
-                      {avail && (
+                      {avail && iOweFeedback && (
+                        <div className="h-8 rounded-md bg-secondary/60 text-center text-xs leading-8 text-muted-foreground">
+                          Submit your feedback first
+                        </div>
+                      )}
+                      {avail && !iOweFeedback && (
                         <Button className="w-full" onClick={() => openBooking(slot)}>
                           Book this slot 🏓
                         </Button>
@@ -477,6 +514,7 @@ export default function Book() {
               ownerId={employee.employeeId}
               max={MAX_PLAYERS}
               onChange={setParticipants}
+              owing={owing}
             />
           </Field>
 

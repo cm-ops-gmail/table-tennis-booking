@@ -302,13 +302,22 @@ async function main() {
       },
     ]);
 
+    const owingBefore = await call("/feedback/owing");
+    ok(
+      "/feedback/owing lists E1 and E2 while their match is unrated",
+      Array.isArray(owingBefore.body.owing) &&
+        owingBefore.body.owing.includes("E1") &&
+        owingBefore.body.owing.includes("E2")
+    );
+
     const blockedBoth = await call("/bookings", {
       body: { ownerId: "E1", participantIds: ["E2"], date: gateDate, slotId: 4 },
     });
     ok("cannot book while feedback is owed (409)", blockedBoth.status === 409, JSON.stringify(blockedBoth.body));
     ok(
-      "feedback-gate message names both owing players",
-      /Alice Rahman/.test(blockedBoth.body.error) && /Bob Karim/.test(blockedBoth.body.error)
+      "feedback-gate message covers the owner (you) and names the owing teammate",
+      /you haven't rated your last match/i.test(blockedBoth.body.error) &&
+        /Bob Karim .*can't be added/i.test(blockedBoth.body.error)
     );
 
     const gateQuestions = (await call("/ratings/questions")).body.questions;
@@ -338,6 +347,12 @@ async function main() {
         answers: [{ questionId: gateQuestions[0].questionId, answer: "4" }],
       },
     });
+
+    const owingAfter = await call("/feedback/owing");
+    ok(
+      "/feedback/owing drops E1 and E2 once both have rated",
+      !owingAfter.body.owing.includes("E1") && !owingAfter.body.owing.includes("E2")
+    );
 
     const unblocked = await call("/bookings", {
       body: { ownerId: "E1", participantIds: ["E2"], date: gateDate, slotId: 4 },

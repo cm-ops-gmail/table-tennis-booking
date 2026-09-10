@@ -88,24 +88,58 @@ async function unratedPastMatches(employeeId: string): Promise<Booking[]> {
   return played.filter((b) => !rated.has(b.bookingId));
 }
 
-/**
- * Blocks a new booking for anyone in `people` who still owes feedback on a
- * past match — one open match at a time keeps the rating data honest.
- */
-async function assertNoOwedFeedback(people: { employeeId: string; name: string }[]): Promise<void> {
-  const owing: string[] = [];
-  for (const p of people) {
-    const pending = await unratedPastMatches(p.employeeId);
-    if (pending.length) owing.push(p.name);
+/** Every employee id that currently has at least one played-but-unrated
+ *  match. The Book page uses this to grey out the booking buttons and mark
+ *  teammates in the picker, before anyone hits Confirm. */
+export async function employeesOwingFeedback(): Promise<string[]> {
+  const all = await listBookings();
+  const played = all.filter((b) => b.status === "Confirmed" && hasSlotStarted(b.date, b.startTime));
+  if (!played.length) return [];
+  const responses = await readTable(TAB.RatingResponses);
+  const rated = new Set(
+    responses.rows.map(
+      (r) => `${(r["Booking ID"] || "").trim()}::${(r["Employee ID"] || "").trim().toLowerCase()}`
+    )
+  );
+  const owing = new Set<string>();
+  for (const b of played) {
+    for (const p of b.participants) {
+      if (!rated.has(`${b.bookingId}::${p.employeeId.toLowerCase()}`)) owing.add(p.employeeId);
+    }
   }
-  if (owing.length) {
-    const who = owing.join(", ");
-    const verb = owing.length > 1 ? "haven't" : "hasn't";
-    throw new HttpError(
-      409,
-      `${who} ${verb} rated their last match yet. Please give feedback on the previous game before booking another slot.`
+  return [...owing];
+}
+
+/**
+ * Blocks a new booking when the owner, or any teammate being added, still
+ * owes feedback on a past match. The message names who and says whether
+ * that's the person booking (can't book) or a teammate (can't be added).
+ */
+async function assertNoOwedFeedback(
+  ownerId: string,
+  people: { employeeId: string; name: string }[]
+): Promise<void> {
+  const owner = ownerId.trim().toLowerCase();
+  let ownerOwes = false;
+  const teammates: string[] = [];
+  for (const p of people) {
+    if (!(await unratedPastMatches(p.employeeId)).length) continue;
+    if (p.employeeId.toLowerCase() === owner) ownerOwes = true;
+    else teammates.push(p.name);
+  }
+  if (!ownerOwes && !teammates.length) return;
+
+  const parts: string[] = [];
+  if (ownerOwes) {
+    parts.push("You haven't rated your last match yet — submit that feedback before booking again.");
+  }
+  if (teammates.length) {
+    const verb = teammates.length > 1 ? "haven't" : "hasn't";
+    parts.push(
+      `${teammates.join(", ")} ${verb} rated their last match, so they can't be added until they do.`
     );
   }
+  throw new HttpError(409, parts.join(" "));
 }
 
 /** All bookings an employee (by id) is part of, most recent first. */
@@ -187,7 +221,7 @@ export async function createBooking(input: CreateBookingInput): Promise<Booking>
   // --- outstanding feedback gate ----------------------------------
   // Nobody on this booking — owner or teammate — may start a new match
   // while a past one still owes them a rating.
-  await assertNoOwedFeedback(people);
+  await assertNoOwedFeedback(ownerId, people);
 
   // --- date / slot availability (Rules 1,7,8) --------------------
   if ((await listBlockedDates()).some((b) => b.date === date)) {

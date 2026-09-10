@@ -8,6 +8,7 @@ import {
   cancelBooking,
   bookingsForEmployee,
   bookingsForDate,
+  employeesOwingFeedback,
 } from "./bookings.js";
 import {
   listBlockedSlots,
@@ -101,6 +102,15 @@ export function createApp() {
     wrap(async (_req, res) => {
       const list = await listEmployees();
       res.json({ employees: list.map(toLite) });
+    })
+  );
+
+  // Employee ids that owe feedback on a played match — the Book page uses
+  // this to block the buttons and mark teammates before Confirm.
+  api.get(
+    "/feedback/owing",
+    wrap(async (_req, res) => {
+      res.json({ owing: await employeesOwingFeedback() });
     })
   );
 
