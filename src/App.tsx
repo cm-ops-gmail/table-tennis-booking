@@ -97,7 +97,7 @@ function Shell({ children }: { children: React.ReactNode }) {
             <span className="hidden text-foreground sm:inline">Table Tennis Booking</span>
           </div>
 
-          <nav className="ml-1 flex items-center gap-0.5 overflow-x-auto">
+          <nav className="ml-1 hidden items-center gap-0.5 overflow-x-auto sm:flex">
             {NAV.map((n) => (
               <NavLink
                 key={n.to}
@@ -168,7 +168,7 @@ function Shell({ children }: { children: React.ReactNode }) {
                   <div className="fixed inset-0 z-40" aria-hidden onClick={() => setMenuOpen(false)} />
                   <div className="absolute right-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-xl border border-border bg-background p-1.5 shadow-lg">
                     {employee && (
-                      <div className="flex items-center gap-2 px-2 py-2">
+                      <div className="flex items-center gap-2 px-2 pb-2 pt-1">
                         <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
                           {initials}
                         </span>
@@ -180,12 +180,30 @@ function Shell({ children }: { children: React.ReactNode }) {
                         </div>
                       </div>
                     )}
+                    <div className="my-1 h-px bg-border" />
+                    {NAV.map((n) => (
+                      <NavLink
+                        key={n.to}
+                        to={n.to}
+                        end={n.end}
+                        className={({ isActive }) =>
+                          cx(
+                            "flex items-center gap-2.5 rounded-lg px-2 py-2 text-sm font-medium no-underline transition-colors",
+                            isActive ? "bg-secondary text-foreground" : "text-foreground hover:bg-accent"
+                          )
+                        }
+                      >
+                        <span className="text-xs">{n.emoji}</span>
+                        {n.label}
+                      </NavLink>
+                    ))}
                     {isAdmin && (
                       <Link
                         to="/admin"
-                        className="flex items-center gap-2 rounded-lg px-2 py-2 text-sm font-medium no-underline transition-colors hover:bg-accent"
+                        className="flex items-center gap-2.5 rounded-lg px-2 py-2 text-sm font-medium no-underline transition-colors hover:bg-accent"
                       >
-                        🛠️ Admin view
+                        <span className="text-xs">🛠️</span>
+                        Admin view
                       </Link>
                     )}
                     <div className="my-1 h-px bg-border" />
