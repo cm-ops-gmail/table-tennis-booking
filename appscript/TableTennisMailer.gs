@@ -25,7 +25,10 @@
  *   Both triggers call the exact same function, `runTableTennisMailer` —
  *   it just re-scans for rows whose marker column (Status /
  *   "Feedback Reminder Sent") is still blank/Pending and sends those. That
- *   makes it safe to run redundantly from either trigger, or manually.
+ *   makes it safe to run redundantly from either trigger, or manually — and
+ *   it's wrapped in a LockService lock so two overlapping firings can't
+ *   both send the same Pending row (which is what duplicate emails to the
+ *   same person almost always mean).
  *
  * SETUP (one time)
  *   1. Open the spreadsheet → Extensions → Apps Script.
@@ -82,11 +85,31 @@ const TT_FEEDBACK_WINDOW_END = "18:00";
  * Entry point + trigger setup
  * ------------------------------------------------------------------ */
 
-/** What both triggers call. Re-scans for anything still unsent and sends
- *  it — safe to run redundantly, manually, or from either trigger type. */
+/**
+ * What both triggers call. Re-scans for anything still unsent and sends
+ * it — safe to run redundantly, manually, or from either trigger type.
+ *
+ * Locked so only one run is ever mid-flight: the on-change trigger can fire
+ * more than once for a single write (Apps Script does this sometimes for a
+ * programmatic multi-row insert), and it can also overlap with the 30-
+ * minute timer. Without a lock, two runs can both read the same row while
+ * it's still "Pending" — before either has marked it Sent — and each sends
+ * it, which is how one cancellation turned into 2-3 identical emails to the
+ * same person. A run that can't get the lock quickly just skips; the next
+ * trigger (on-change or the timer) tries again shortly after.
+ */
 function runTableTennisMailer() {
-  sendPendingNotifications_();
-  sendFeedbackReminders_();
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) {
+    Logger.log("Another run is already sending — skipping this one to avoid duplicates.");
+    return;
+  }
+  try {
+    sendPendingNotifications_();
+    sendFeedbackReminders_();
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 /** Run this once from the editor — installs both triggers described above. */
