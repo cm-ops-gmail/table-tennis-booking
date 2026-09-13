@@ -51,9 +51,9 @@
  * the domain ever changes. TT_CALENDAR_ID picks which calendar gets the
  * booking events — blank (the default) means whichever Google account this
  * script runs as; point it at a shared/resource calendar's id instead if
- * you have one for the table/room. TT_FROM_EMAIL sends every email from
- * that address instead — only takes effect once it's a verified "Send As"
- * alias on the account running the script (see the constant's own comment).
+ * you have one for the table/room. Every email is sent from whichever
+ * Google account authorized/runs the script — there's no separate "From"
+ * override.
  *
  * WHAT IT DOES
  *   - Booking confirmed / cancelled → emails every participant, each
@@ -85,12 +85,6 @@ const TT_TAB_BOOKINGS = "Bookings";
 const TT_TIMEZONE = "Asia/Dhaka";
 const TT_TRIGGER_FN = "runTableTennisMailer";
 const TT_BRAND = "10 Minute School — Table Tennis";
-// Every email is sent From this address instead of whichever Google account
-// authorized the script. Gmail only honors this if TT_FROM_EMAIL is a
-// verified "Send As" alias on that account (Gmail → Settings → Accounts and
-// Import → "Send mail as") — otherwise it silently falls back to sending as
-// the real account, no error. Set to "" to just send as that real account.
-const TT_FROM_EMAIL = "peopleops@10minuteschool.com";
 // The live site — used to build the "Submit feedback" / "View my bookings"
 // links in emails. Edit this one line if the domain ever changes.
 const TT_APP_URL = "https://tenms-table-tennis-booking.vercel.app";
@@ -185,7 +179,6 @@ function sendTestEmailToMyself() {
         '<p style="margin:0;font-size:14px;color:#333;line-height:1.6;">If you can read this, the Table Tennis Apps Script mailer is wired up correctly and ready to send real booking emails.</p>'
       ),
       name: TT_BRAND,
-      from: TT_FROM_EMAIL || undefined,
     }
   );
   Logger.log("Sent a test email to " + me);
@@ -213,7 +206,6 @@ function sendPendingNotifications_() {
       GmailApp.sendEmail(to, String(row["Subject"] || "Table Tennis Booking"), String(row["Body"] || ""), {
         htmlBody: renderNotificationEmail_(row),
         name: TT_BRAND,
-        from: TT_FROM_EMAIL || undefined,
       });
       sheet.getRange(row.__row, statusCol).setValue("Sent");
       sent++;
@@ -274,7 +266,6 @@ function sendFeedbackReminders_() {
           {
             htmlBody: renderFeedbackReminderEmail_(names[i] || "there", row, date),
             name: TT_BRAND,
-            from: TT_FROM_EMAIL || undefined,
           }
         );
       } catch (err) {
