@@ -63,9 +63,15 @@ either.
   that fails to create is recorded the same way, in `Calendar Event ID`
   (e.g. `Failed: ...`) — that row is left alone on later runs rather than
   retried forever; clear the cell by hand to have it try again.
-- `MailApp.sendEmail` quota depends on the Google account type (a Workspace
+- `GmailApp.sendEmail` quota depends on the Google account type (a Workspace
   account has a much higher daily limit than a personal Gmail account) — if
   the tool sees heavy use, keep an eye on `Failed: ... quota` errors.
+- Emails send From `TT_FROM_EMAIL` (currently `peopleops@10minuteschool.com`)
+  instead of the account that authorized the script — but only if that
+  address is a verified "Send As" alias on that account (Gmail → Settings →
+  Accounts and Import → "Send mail as"). Without it, Gmail silently falls
+  back to sending as the real account; no error, it just won't change. Set
+  `TT_FROM_EMAIL = ""` to always send as the real account.
 - Guests only get an *invite* — Calendar can't add an event straight onto
   someone else's calendar without their own permission. Most Workspace
   accounts show it immediately either way; whether it's auto-accepted
