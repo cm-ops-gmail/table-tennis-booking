@@ -32,10 +32,12 @@ const SIN_P = Math.sin(PITCH);
 const COS_P = Math.cos(PITCH);
 
 type Diff = "easy" | "normal" | "hard";
-const AI: Record<Diff, { speed: number; reachX: number; reachY: number; err: number; react: number }> = {
-  easy: { speed: 2.6, reachX: 0.5, reachY: 0.46, err: 0.9, react: NET_Z + 1.6 },
-  normal: { speed: 3.7, reachX: 0.42, reachY: 0.4, err: 0.5, react: NET_Z + 0.4 },
-  hard: { speed: 5.0, reachX: 0.4, reachY: 0.38, err: 0.2, react: NET_Z - 0.6 },
+// `reach` is a multiplier on the drawn blade size (see paddleHalfSize) — how
+// forgiving a hit is, in on-screen terms, not world-space x/y/z.
+const AI: Record<Diff, { speed: number; reach: number; err: number; react: number }> = {
+  easy: { speed: 2.6, reach: 2.1, err: 0.9, react: NET_Z + 1.6 },
+  normal: { speed: 3.7, reach: 1.75, err: 0.5, react: NET_Z + 0.4 },
+  hard: { speed: 5.0, reach: 1.55, err: 0.2, react: NET_Z - 0.6 },
 };
 
 interface V3 {
@@ -70,6 +72,34 @@ function project(x: number, y: number, z: number) {
   const cz = Math.max(0.2, ry * SIN_P + rz * COS_P);
   const s = FOCAL / cz;
   return { x: CX + x * s, y: CY - cy * s, s };
+}
+
+/** Half-width/height of a paddle's drawn blade, in canvas-internal px, given
+ *  its projected scale `s`. Shared by rendering and hit-testing so the two
+ *  can never drift apart. */
+function paddleHalfSize(s: number): { w: number; h: number } {
+  const w = Math.min(32, Math.max(6, 0.15 * s));
+  return { w, h: w * 1.25 };
+}
+
+/**
+ * True when the ball is close enough to the paddle on screen to count as a
+ * hit. This checks projected (screen) position rather than world-space
+ * x/y/z separately — perspective makes those misleading on their own: a
+ * ball still far up the table projects near the vanishing point, nowhere
+ * close to a paddle that sits near the camera, even when some raw
+ * world-space coordinate happens to line up. `forgiveness` scales the
+ * blade's own drawn size (1 = must visually touch the blade).
+ */
+function paddleContact(ball: V3, pad: V3, forgiveness: number): boolean {
+  const b = project(ball.x, ball.y, ball.z);
+  const p = project(pad.x, pad.y, pad.z);
+  const { w, h } = paddleHalfSize(p.s);
+  const dx = b.x - p.x;
+  const dy = b.y - p.y;
+  const rw = w * forgiveness;
+  const rh = h * forgiveness;
+  return (dx * dx) / (rw * rw) + (dy * dy) / (rh * rh) <= 1;
 }
 
 /** velocity to travel from `p` to land (y=0) at (tx,tz) after time T under gravity */
@@ -274,16 +304,9 @@ export default function Play() {
         }
 
         /* ---- player strike ---- */
-        // Hit box roughly matches the drawn blade (a little forgiving, not
-        // the old ~9x-oversized zone that "hit" balls flying past the bat).
-        if (
-          st.canHit &&
-          st.vel.z < 0 &&
-          st.ball.z < st.pPad.z + 0.38 &&
-          st.ball.z > st.pPad.z - 0.42 &&
-          Math.abs(st.ball.x - st.pPad.x) < 0.34 &&
-          Math.abs(st.ball.y - st.pPad.y) < 0.34
-        ) {
+        // Checked on screen (see paddleContact) so perspective can't make a
+        // ball that's still visibly far up the table register as a hit.
+        if (st.canHit && st.vel.z < 0 && paddleContact(st.ball, st.pPad, 1.5)) {
           const tz = NET_Z + (FAR_Z - NET_Z) * (0.35 + Math.random() * 0.5);
           const tx = Math.max(-TABLE_HW * 0.9, Math.min(TABLE_HW * 0.9, st.pPad.x * 0.55 + (Math.random() * 0.5 - 0.25)));
           const T = 0.52 + Math.random() * 0.08;
@@ -315,14 +338,7 @@ export default function Play() {
         }
         st.aPad.x = Math.max(-TABLE_HW - 0.35, Math.min(TABLE_HW + 0.35, st.aPad.x));
 
-        if (
-          st.aiCanHit &&
-          st.vel.z > 0 &&
-          st.ball.z > st.aPad.z - 0.6 &&
-          st.ball.z < st.aPad.z + 0.55 &&
-          Math.abs(st.ball.x - st.aPad.x) < A.reachX &&
-          Math.abs(st.ball.y - st.aPad.y) < A.reachY
-        ) {
+        if (st.aiCanHit && st.vel.z > 0 && paddleContact(st.ball, st.aPad, A.reach)) {
           const tz = NEAR_Z + (NET_Z - NEAR_Z) * (0.25 + Math.random() * 0.55);
           const tx = Math.max(
             -TABLE_HW * 0.92,
@@ -469,10 +485,7 @@ export default function Play() {
       // --- paddles ---
       const pad = (p: V3, col: string) => {
         const c = project(p.x, p.y, p.z);
-        // Blade drawn close to the actual hit box so a "hit" always looks
-        // like contact.
-        const w = Math.min(32, Math.max(6, 0.15 * c.s));
-        const h = w * 1.25;
+        const { w, h } = paddleHalfSize(c.s);
         // handle
         ctx.strokeStyle = "rgba(90,70,55,0.9)";
         ctx.lineWidth = Math.max(2, w * 0.32);
