@@ -71,10 +71,13 @@
  *     mandatory before the next booking matches the app's own rule (a
  *     player with any unrated past match is blocked from booking again).
  *   - Calendar sync → every newly Confirmed booking gets a Calendar event
- *     (title, the slot's time, all participants added as guests so it
- *     lands as an invite in each of their own calendars); a booking that's
- *     since been Cancelled has its event removed again. The "Calendar
- *     Event ID" column tracks which bookings already have one.
+ *     (title, the slot's time, the same wording as the "booking confirmed"
+ *     email in its description) with the owner and every player — but not
+ *     their line managers or HR — added as guests, so it lands as an invite
+ *     in each player's own calendar. A booking that's since been Cancelled
+ *     has its event removed again. Feedback reminders never touch Calendar
+ *     — those stay email-only. The "Calendar Event ID" column tracks which
+ *     bookings already have one.
  *
  * Nothing here runs on its own until you complete step 3 above.
  * ============================================================================
@@ -292,12 +295,48 @@ function ttDateTime_(dateStr, hhmm) {
   return new Date(dateStr + "T" + hhmm + ":00+06:00");
 }
 
+/** "Name (ID)", each marked "— owner" for the booking owner — matches the
+ *  app's own fmtPlayers() in api/_lib/notify.ts, rebuilt from sheet columns
+ *  since the .gs side doesn't have access to that Booking object. */
+function ttPlayersLine_(row) {
+  var ids = splitList_(row["Participant IDs"]);
+  var names = splitList_(row["Participant Names"]);
+  var ownerId = String(row["Owner ID"] || "").trim();
+  var parts = [];
+  for (var i = 0; i < names.length; i++) {
+    var id = (ids[i] || "").trim();
+    parts.push(names[i] + " (" + id + ")" + (id && id === ownerId ? " — owner" : ""));
+  }
+  return parts.join(", ");
+}
+
+/** Same wording as the "booking confirmed" email every participant already
+ *  gets (api/_lib/notify.ts's participantConfirmed) — the calendar invite's
+ *  description should read like that email, not a separate generic blurb.
+ *  The email's greeting is personalized per recipient ("Hi <name>,"); the
+ *  invite is one shared description for every guest, so it opens with a
+ *  group-friendly "Hi team," instead. */
+function ttConfirmedDescription_(row, date) {
+  return (
+    "Hi team,\n\n" +
+    "Your Table Tennis match is officially booked! 🏓🔥\n\n" +
+    "Booking Date: " + date + "\n" +
+    "Match Time: " + row["Slot Label"] + "\n" +
+    "All Players: " + ttPlayersLine_(row) + "\n" +
+    "Booking ID: " + row["Booking ID"] + "\n\n" +
+    "Time to bring your A-game. 😎\n\n" +
+    "Happy playing!"
+  );
+}
+
 /**
  * Creates a Calendar event for every newly Confirmed booking (participants
- * as guests, so each gets an invite in their own calendar) and removes the
- * event again for any booking that's since been Cancelled. The "Calendar
- * Event ID" column doubles as both the record of an event existing and the
- * key to find it again — blank means "not created yet" for a Confirmed
+ * as guests, so each gets an invite in their own calendar — line managers
+ * and HR are NOT invited, they only get the email) and removes the event
+ * again for any booking that's since been Cancelled. Feedback reminders
+ * never touch Calendar at all — those stay email-only. The "Calendar Event
+ * ID" column doubles as both the record of an event existing and the key
+ * to find it again — blank means "not created yet" for a Confirmed
  * booking, or "already cleaned up" for a Cancelled one.
  */
 function syncCalendarEvents_() {
@@ -332,11 +371,7 @@ function syncCalendarEvents_() {
           {
             guests: emails.join(","),
             sendInvites: true,
-            description:
-              "Booked via the Table Tennis Booking app.\n" +
-              "Players: " + row["Participant Names"] + "\n" +
-              "Booking ID: " + row["Booking ID"] +
-              (TT_APP_URL ? "\n\n" + TT_APP_URL + "/my-bookings" : ""),
+            description: ttConfirmedDescription_(row, date),
           }
         );
         sheet.getRange(row.__row, evCol).setValue(event.getId());
