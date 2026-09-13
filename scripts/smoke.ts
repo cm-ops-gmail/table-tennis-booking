@@ -155,7 +155,11 @@ async function main() {
     const { memReadTable } = await import("../api/_lib/memstore");
     const notif = memReadTable("Notifications");
     ok("notifications queued Pending", notif.rows.length > 0 && notif.rows.every((r) => r["Status"] === "Pending"));
-    ok("has line_manager + hr_admin + participant rows", new Set(notif.rows.map((r) => r["Recipient Role"])).size >= 2);
+    ok(
+      "has line_manager + hr_admin rows, no participant email rows (they get a Calendar invite instead)",
+      new Set(notif.rows.map((r) => r["Recipient Role"])).size >= 2 &&
+        notif.rows.every((r) => r["Recipient Role"] !== "participant")
+    );
 
     // E1 and E2 (this first booking's players) share the same line manager
     // (mgr1@10ms.test) — that manager must get exactly one email for THIS

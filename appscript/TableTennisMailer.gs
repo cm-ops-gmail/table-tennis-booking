@@ -56,28 +56,31 @@
  * override.
  *
  * WHAT IT DOES
- *   - Booking confirmed / cancelled → emails every participant, each
- *     participant's line manager (ONE email per manager even if they
- *     manage more than one player on the same booking — the app already
- *     groups these before writing the row), and HR. All of this is just
- *     "send whatever's Pending in the Notifications tab" — the app decides
- *     who gets what.
+ *   - Booking confirmed / cancelled → emails each participant's line
+ *     manager (ONE email per manager even if they manage more than one
+ *     player on the same booking — the app already groups these before
+ *     writing the row) and HR. Players themselves get NO email for this —
+ *     see Calendar sync below for how they find out instead. All of this
+ *     is just "send whatever's Pending in the Notifications tab" — the app
+ *     decides who gets what.
  *   - Feedback reminder → sent directly by this script, not queued by the
  *     app, because it's driven by wall-clock time rather than a booking
  *     action: once a Confirmed booking's slot end time has passed and its
  *     "Feedback Reminder Sent" column isn't already TRUE, every participant
- *     gets a reminder with a link to the Rate & feedback page, and the row
- *     is marked so it's never sent twice. The note that feedback is
- *     mandatory before the next booking matches the app's own rule (a
+ *     gets a reminder email with a link to the Rate & feedback page, and
+ *     the row is marked so it's never sent twice. The note that feedback
+ *     is mandatory before the next booking matches the app's own rule (a
  *     player with any unrated past match is blocked from booking again).
  *   - Calendar sync → every newly Confirmed booking gets a Calendar event
- *     (title, the slot's time, the same wording as the "booking confirmed"
- *     email in its description) with the owner and every player — but not
- *     their line managers or HR — added as guests, so it lands as an invite
- *     in each player's own calendar. A booking that's since been Cancelled
- *     has its event removed again. Feedback reminders never touch Calendar
- *     — those stay email-only. The "Calendar Event ID" column tracks which
- *     bookings already have one.
+ *     (title, the slot's time, the same "officially booked" wording the
+ *     app used to email participants, now in the invite's description)
+ *     with the owner and every player — but not their line managers or
+ *     HR — added as guests. That invite IS a player's confirmation; there's
+ *     no separate email for it. A booking that's since been Cancelled has
+ *     its event deleted again, which is what tells players it's off —
+ *     Calendar sends its own cancellation notice to the guests. Feedback
+ *     reminders never touch Calendar — those stay email-only. The
+ *     "Calendar Event ID" column tracks which bookings already have one.
  *
  * Nothing here runs on its own until you complete step 3 above.
  * ============================================================================

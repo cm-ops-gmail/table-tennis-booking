@@ -10,16 +10,16 @@ project (Extensions → Apps Script), not deployed anywhere separately.
 
 | Event | Trigger | Effect |
 |---|---|---|
-| Booking confirmed | Employee books a slot | Emails every participant, each participant's line manager (one email per manager, even if they manage more than one player on the same booking), and HR. Also creates a Calendar event for the slot with every participant added as a guest. |
-| Booking cancelled | Owner cancels | Same email recipients as above. Also deletes the Calendar event created for that booking. |
-| Feedback reminder | A booked slot's end time passes | Every participant on that booking gets an email with a link to Rate & feedback — and a note that feedback is mandatory before their next booking. |
+| Booking confirmed | Employee books a slot | Creates a Calendar event for the slot with the owner and every player added as a guest — that invite (its description carries the same "officially booked" wording an email would) is the player's confirmation, no separate email. Each participant's line manager (one email per manager, even if they manage more than one player on the same booking) and HR get an actual email instead, since they're never added to the invite. |
+| Booking cancelled | Owner cancels | Deletes that Calendar event — Calendar's own cancellation notice tells the guests. Line managers and HR get a "cancelled" email, same grouping as above. |
+| Feedback reminder | A booked slot's end time passes | Every participant on that booking gets an email with a link to Rate & feedback — and a note that feedback is mandatory before their next booking. Calendar is never touched for this. |
 
-The emails are queued by the app and just need sending. The feedback
-reminder and the calendar sync are different: both are driven by wall-clock
-time / booking status rather than a one-off action, so this script watches
-the `Bookings` tab directly — marking each row's `Feedback Reminder Sent`
-and `Calendar Event ID` columns as it handles them — nothing to queue for
-either.
+The manager/HR emails are queued by the app and just need sending. The
+feedback reminder and the calendar sync are different: both are driven by
+wall-clock time / booking status rather than a one-off action, so this
+script watches the `Bookings` tab directly — marking each row's `Feedback
+Reminder Sent` and `Calendar Event ID` columns as it handles them —
+nothing to queue for either.
 
 ## Setup (one time, ~2 minutes)
 
