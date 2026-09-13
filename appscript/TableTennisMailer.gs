@@ -1,11 +1,14 @@
 /**
- * Table Tennis Booking — Email Mailer
+ * Table Tennis Booking — Email Mailer + Calendar Sync
  * ============================================================================
- * This app (the Node/Vercel backend) never sends email itself — it only
- * writes rows to the `Notifications` tab with Status = "Pending". This
- * script, bound to the same spreadsheet, is what actually sends the mail.
- * It also independently watches the `Bookings` tab and sends a "please rate
- * this match" reminder once each slot's end time has passed.
+ * This app (the Node/Vercel backend) never sends email itself, or touches
+ * Google Calendar — it only writes rows to the `Notifications` tab with
+ * Status = "Pending". This script, bound to the same spreadsheet, is what
+ * actually sends the mail and creates/removes the Calendar events. It
+ * independently watches the `Bookings` tab for two things wall-clock time
+ * (not a booking action) has to drive: a "please rate this match" reminder
+ * once each slot's end time has passed, and keeping Calendar events in sync
+ * with each booking's Confirmed/Cancelled status.
  *
  * TWO TRIGGERS, EACH DOING A DIFFERENT JOB
  *   - An "on change" trigger fires within seconds of a new row landing in
@@ -37,22 +40,26 @@
  *      exist somewhere in the project).
  *   3. In the Apps Script editor, select `setupTableTennisMailer` from the
  *      function dropdown at the top and click ▶ Run. The first run will ask
- *      you to authorize the script (it needs to send email and read/write
- *      this spreadsheet) — approve it. This installs both triggers above;
- *      you don't need to run anything manually again.
+ *      you to authorize the script (it needs to send email, read/write this
+ *      spreadsheet, and manage Calendar events) — approve it. This installs
+ *      both triggers above; you don't need to run anything manually again.
  *   4. Optional: run `sendTestEmailToMyself` once to confirm mail delivery
  *      works before relying on it for real bookings.
  *
  * The live site URL used for the "Submit feedback" / "View my bookings"
  * links is the hardcoded TT_APP_URL constant below — edit that one line if
- * the domain ever changes.
+ * the domain ever changes. TT_CALENDAR_ID picks which calendar gets the
+ * booking events — blank (the default) means whichever Google account this
+ * script runs as; point it at a shared/resource calendar's id instead if
+ * you have one for the table/room.
  *
- * WHAT IT SENDS
- *   - Booking confirmed / cancelled → every participant, each participant's
- *     line manager (ONE email per manager even if they manage more than one
- *     player on the same booking — the app already groups these before
- *     writing the row), and HR. All of this is just "send whatever's
- *     Pending in the Notifications tab" — the app decides who gets what.
+ * WHAT IT DOES
+ *   - Booking confirmed / cancelled → emails every participant, each
+ *     participant's line manager (ONE email per manager even if they
+ *     manage more than one player on the same booking — the app already
+ *     groups these before writing the row), and HR. All of this is just
+ *     "send whatever's Pending in the Notifications tab" — the app decides
+ *     who gets what.
  *   - Feedback reminder → sent directly by this script, not queued by the
  *     app, because it's driven by wall-clock time rather than a booking
  *     action: once a Confirmed booking's slot end time has passed and its
@@ -61,8 +68,13 @@
  *     is marked so it's never sent twice. The note that feedback is
  *     mandatory before the next booking matches the app's own rule (a
  *     player with any unrated past match is blocked from booking again).
+ *   - Calendar sync → every newly Confirmed booking gets a Calendar event
+ *     (title, the slot's time, all participants added as guests so it
+ *     lands as an invite in each of their own calendars); a booking that's
+ *     since been Cancelled has its event removed again. The "Calendar
+ *     Event ID" column tracks which bookings already have one.
  *
- * Nothing here runs on its own until you complete step 4 above.
+ * Nothing here runs on its own until you complete step 3 above.
  * ============================================================================
  */
 
@@ -71,15 +83,15 @@ const TT_TAB_BOOKINGS = "Bookings";
 const TT_TIMEZONE = "Asia/Dhaka";
 const TT_TRIGGER_FN = "runTableTennisMailer";
 const TT_BRAND = "10 Minute School — Table Tennis";
-// Every email is sent From this address instead of whichever Google account
-// authorized the script. Gmail only honors this if TT_FROM_EMAIL is a
-// verified "Send As" alias on that account (Gmail → Settings → Accounts and
-// Import → "Send mail as") — otherwise it silently falls back to sending as
-// the real account, no error. Set to "" to just send as that real account.
-const TT_FROM_EMAIL = "peopleops@10minuteschool.com";
 // The live site — used to build the "Submit feedback" / "View my bookings"
 // links in emails. Edit this one line if the domain ever changes.
 const TT_APP_URL = "https://tenms-table-tennis-booking.vercel.app";
+// Which calendar gets the "🏓 Table Tennis" events (see syncCalendarEvents_
+// below). Blank = the primary calendar of whichever Google account this
+// script runs as. Put a shared/resource calendar's id here instead (Google
+// Calendar → that calendar's settings → "Integrate calendar" → Calendar ID)
+// if you'd rather the booking show up on a dedicated table/room calendar.
+const TT_CALENDAR_ID = "";
 // The feedback-reminder scan only matters while slots can be running — no
 // booking ends outside this window, so there's nothing to check overnight.
 // Edit these two if the facility's hours ever change (currently 1:00 PM –
@@ -113,6 +125,7 @@ function runTableTennisMailer() {
   try {
     sendPendingNotifications_();
     sendFeedbackReminders_();
+    syncCalendarEvents_();
   } finally {
     lock.releaseLock();
   }
@@ -154,19 +167,15 @@ function sendTestEmailToMyself() {
     Logger.log("Could not determine your email — run this from the Apps Script editor while signed in.");
     return;
   }
-  GmailApp.sendEmail(
-    me,
-    "Table Tennis mailer — test email",
-    "If you can read this, the Table Tennis Apps Script mailer is wired up correctly and ready to send real booking emails.",
-    {
-      htmlBody: emailShell_(
-        "Test email ✅",
-        '<p style="margin:0;font-size:14px;color:#333;line-height:1.6;">If you can read this, the Table Tennis Apps Script mailer is wired up correctly and ready to send real booking emails.</p>'
-      ),
-      name: TT_BRAND,
-      from: TT_FROM_EMAIL || undefined,
-    }
-  );
+  MailApp.sendEmail({
+    to: me,
+    subject: "Table Tennis mailer — test email",
+    htmlBody: emailShell_(
+      "Test email ✅",
+      '<p style="margin:0;font-size:14px;color:#333;line-height:1.6;">If you can read this, the Table Tennis Apps Script mailer is wired up correctly and ready to send real booking emails.</p>'
+    ),
+    name: TT_BRAND,
+  });
   Logger.log("Sent a test email to " + me);
 }
 
@@ -189,10 +198,11 @@ function sendPendingNotifications_() {
       continue;
     }
     try {
-      GmailApp.sendEmail(to, String(row["Subject"] || "Table Tennis Booking"), String(row["Body"] || ""), {
+      MailApp.sendEmail({
+        to,
+        subject: String(row["Subject"] || "Table Tennis Booking"),
         htmlBody: renderNotificationEmail_(row),
         name: TT_BRAND,
-        from: TT_FROM_EMAIL || undefined,
       });
       sheet.getRange(row.__row, statusCol).setValue("Sent");
       sent++;
@@ -246,16 +256,12 @@ function sendFeedbackReminders_() {
     for (let i = 0; i < emails.length; i++) {
       if (!emails[i]) continue;
       try {
-        GmailApp.sendEmail(
-          emails[i],
-          "How was your Table Tennis match? Feedback needed — " + row["Slot Label"],
-          "Your match on " + date + " (" + row["Slot Label"] + ") has wrapped up — please submit your feedback: " + TT_APP_URL + "/rate",
-          {
-            htmlBody: renderFeedbackReminderEmail_(names[i] || "there", row, date),
-            name: TT_BRAND,
-            from: TT_FROM_EMAIL || undefined,
-          }
-        );
+        MailApp.sendEmail({
+          to: emails[i],
+          subject: "How was your Table Tennis match? Feedback needed — " + row["Slot Label"],
+          htmlBody: renderFeedbackReminderEmail_(names[i] || "there", row, date),
+          name: TT_BRAND,
+        });
       } catch (err) {
         allOk = false;
       }
@@ -265,6 +271,86 @@ function sendFeedbackReminders_() {
     if (allOk) remindedMatches++;
   }
   if (remindedMatches) Logger.log("Sent feedback reminders for " + remindedMatches + " match(es).");
+}
+
+/* ------------------------------------------------------------------ *
+ * 3. Google Calendar — one event per booking, guests = the players
+ * ------------------------------------------------------------------ */
+
+function ttCalendar_() {
+  return TT_CALENDAR_ID ? CalendarApp.getCalendarById(TT_CALENDAR_ID) : CalendarApp.getDefaultCalendar();
+}
+
+/** "YYYY-MM-DD" + "HH:mm" (Asia/Dhaka, a fixed UTC+6 with no DST) → Date. */
+function ttDateTime_(dateStr, hhmm) {
+  return new Date(dateStr + "T" + hhmm + ":00+06:00");
+}
+
+/**
+ * Creates a Calendar event for every newly Confirmed booking (participants
+ * as guests, so each gets an invite in their own calendar) and removes the
+ * event again for any booking that's since been Cancelled. The "Calendar
+ * Event ID" column doubles as both the record of an event existing and the
+ * key to find it again — blank means "not created yet" for a Confirmed
+ * booking, or "already cleaned up" for a Cancelled one.
+ */
+function syncCalendarEvents_() {
+  const { sheet, headers, rows } = readSheetObjects_(TT_TAB_BOOKINGS);
+  if (!sheet) return;
+  const evCol = headers.indexOf("Calendar Event ID") + 1;
+  if (!evCol) {
+    Logger.log("Bookings tab is missing the 'Calendar Event ID' column — re-run the app's provisioning script.");
+    return;
+  }
+  const cal = ttCalendar_();
+  let created = 0;
+  let removed = 0;
+
+  for (const row of rows) {
+    const status = String(row["Status"] || "").trim();
+    const eventId = String(row["Calendar Event ID"] || "").trim();
+
+    if (status === "Confirmed" && !eventId) {
+      const date = ttNormDate_(row["Date"]);
+      const start = ttNormTime_(row["Start Time"]);
+      const end = ttNormTime_(row["End Time"]);
+      if (!date || !start || !end) continue;
+      const emails = splitList_(row["Participant Emails"]).filter(function (e) {
+        return e && e.indexOf("@") > -1;
+      });
+      try {
+        const event = cal.createEvent(
+          "🏓 Table Tennis — " + row["Slot Label"],
+          ttDateTime_(date, start),
+          ttDateTime_(date, end),
+          {
+            guests: emails.join(","),
+            sendInvites: true,
+            description:
+              "Booked via the Table Tennis Booking app.\n" +
+              "Players: " + row["Participant Names"] + "\n" +
+              "Booking ID: " + row["Booking ID"] +
+              (TT_APP_URL ? "\n\n" + TT_APP_URL + "/my-bookings" : ""),
+          }
+        );
+        sheet.getRange(row.__row, evCol).setValue(event.getId());
+        created++;
+      } catch (err) {
+        sheet.getRange(row.__row, evCol).setValue("Failed: " + err.message);
+      }
+    } else if (status === "Cancelled" && eventId && eventId.indexOf("Failed") !== 0) {
+      try {
+        const event = cal.getEventById(eventId);
+        if (event) event.deleteEvent();
+      } catch (err) {
+        // Already gone, or no longer accessible — nothing more to do here.
+      }
+      sheet.getRange(row.__row, evCol).setValue("");
+      removed++;
+    }
+  }
+  if (created) Logger.log("Created " + created + " calendar event(s).");
+  if (removed) Logger.log("Removed " + removed + " cancelled calendar event(s).");
 }
 
 /* ------------------------------------------------------------------ *

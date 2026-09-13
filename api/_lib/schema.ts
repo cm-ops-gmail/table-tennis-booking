@@ -60,6 +60,10 @@ export const HEADERS: Record<string, string[]> = {
     // post-match "please rate this game" reminder — not written by the app.
     "Feedback Reminder Sent",
     "Feedback Reminder Sent At",
+    // Also Apps Script's, not the app's: the Google Calendar event id once
+    // one's been created for this booking, so the script can find it again
+    // to delete it if the booking is later cancelled. Blank = no event yet.
+    "Calendar Event ID",
   ],
 
   // One tab for slot blocks, full-day blocks, AND blocked users.
