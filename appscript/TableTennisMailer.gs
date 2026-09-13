@@ -399,14 +399,16 @@ function renderFeedbackReminderEmail_(name, bookingRow, dateStr) {
     '<p style="margin:0 0 12px;font-size:14px;color:#333;">Hi ' +
     escapeHtml_(name) +
     ",</p>" +
-    '<p style="margin:0 0 12px;font-size:14px;color:#333;line-height:1.6;">Hope you enjoyed your match! Your Table Tennis game on <strong>' +
+    '<p style="margin:0 0 10px;font-size:14px;color:#333;line-height:1.6;">How was your Table Tennis experience? Take a quick minute to rate your vibe and tell us what you think. ✨</p>' +
+    '<p style="margin:0 0 12px;font-size:12.5px;color:#8a8a8a;">Match: <strong style="color:#333;">' +
     escapeHtml_(dateStr || bookingRow["Date"]) +
-    "</strong> at <strong>" +
+    '</strong> at <strong style="color:#333;">' +
     escapeHtml_(bookingRow["Slot Label"]) +
-    "</strong> has wrapped up — we'd love a minute of your feedback.</p>" +
+    "</strong></p>" +
     ctaButton_(TT_APP_URL + "/rate", "Submit feedback") +
+    '<p style="margin:16px 0 0;font-size:14px;color:#333;line-height:1.6;">Game done. Feedback time and get ready for next game 🎯</p>' +
     '<p style="margin:20px 0 0;font-size:12.5px;color:#8a5a00;background:#fff8e1;border:1px solid #ffe6a3;border-radius:8px;padding:10px 14px;line-height:1.5;">' +
     "<strong>Note:</strong> Feedback is mandatory — until you submit it for this match, you won't be able to book another Table Tennis slot." +
     "</p>";
-  return emailShell_("How was your match? 🏓", body, "Table Tennis Booking System · 10 Minute School");
+  return emailShell_("You played the game, now spill the tea! 👀🏓", body, "Table Tennis Booking System · 10 Minute School");
 }
