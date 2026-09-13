@@ -505,6 +505,37 @@ function escapeHtml_(s) {
     .replace(/>/g, "&gt;");
 }
 
+/** Emoji like 🏓, 👀, 🎯 sit outside the Basic Multilingual Plane and need a
+ *  UTF-16 surrogate pair — those have been observed arriving as mangled "�"
+ *  replacement characters in delivered mail, while single-unit characters
+ *  (✨, the — dash) come through fine. The strings themselves are correct
+ *  right up until MailApp sends them (confirmed by reading the very same
+ *  text straight back out of the spreadsheet), so something downstream of
+ *  this script doesn't round-trip a surrogate pair correctly. Numeric HTML
+ *  character references are plain ASCII and sidestep that entirely — every
+ *  mail client decodes them into the right glyph regardless of transport —
+ *  so every HTML email is passed through this right before sending.
+ *  Everything else (tags, attributes, ASCII, BMP characters) passes through
+ *  untouched. */
+function ttSafeHtml_(html) {
+  var s = String(html || "");
+  var out = "";
+  for (var i = 0; i < s.length; i++) {
+    var code = s.charCodeAt(i);
+    if (code >= 0xd800 && code <= 0xdbff && i + 1 < s.length) {
+      var low = s.charCodeAt(i + 1);
+      if (low >= 0xdc00 && low <= 0xdfff) {
+        var cp = (code - 0xd800) * 0x400 + (low - 0xdc00) + 0x10000;
+        out += "&#" + cp + ";";
+        i++;
+        continue;
+      }
+    }
+    out += s.charAt(i);
+  }
+  return out;
+}
+
 /** Plain-text "Label: value" lines → paragraphs with bolded labels. */
 function bodyToHtml_(text) {
   const lines = String(text || "").split("\n");
@@ -548,28 +579,28 @@ function ctaButton_(url, label) {
 
 /** The shared branded card every email is wrapped in. */
 function emailShell_(title, innerHtml, footerNote) {
-  return (
+  return ttSafeHtml_(
     '<div style="background:#f4f4f4;padding:28px 12px;font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,Helvetica,Arial,sans-serif;">' +
-    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e8e8e8;">' +
-    "<tr><td>" +
-    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="background:#141414;padding:18px 28px;">' +
-    '<span style="font-size:18px;vertical-align:middle;">🏓</span>' +
-    '<span style="color:#ffffff;font-size:15px;font-weight:600;margin-left:10px;vertical-align:middle;">' +
-    TT_BRAND +
-    "</span>" +
-    "</td></tr></table>" +
-    '<div style="padding:28px 28px 8px;">' +
-    '<h1 style="margin:0 0 14px;font-size:19px;line-height:1.4;color:#141414;">' +
-    escapeHtml_(title) +
-    "</h1>" +
-    innerHtml +
-    "</div>" +
-    '<div style="padding:16px 28px;margin-top:12px;background:#fafafa;border-top:1px solid #eee;color:#9a9a9a;font-size:11.5px;line-height:1.5;">' +
-    (footerNote ||
-      "This is an automated message from the Table Tennis Booking System. Please don't reply directly to this email.") +
-    "</div>" +
-    "</td></tr></table>" +
-    "</div>"
+      '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e8e8e8;">' +
+      "<tr><td>" +
+      '<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="background:#141414;padding:18px 28px;">' +
+      '<span style="font-size:18px;vertical-align:middle;">🏓</span>' +
+      '<span style="color:#ffffff;font-size:15px;font-weight:600;margin-left:10px;vertical-align:middle;">' +
+      TT_BRAND +
+      "</span>" +
+      "</td></tr></table>" +
+      '<div style="padding:28px 28px 8px;">' +
+      '<h1 style="margin:0 0 14px;font-size:19px;line-height:1.4;color:#141414;">' +
+      escapeHtml_(title) +
+      "</h1>" +
+      innerHtml +
+      "</div>" +
+      '<div style="padding:16px 28px;margin-top:12px;background:#fafafa;border-top:1px solid #eee;color:#9a9a9a;font-size:11.5px;line-height:1.5;">' +
+      (footerNote ||
+        "This is an automated message from the Table Tennis Booking System. Please don't reply directly to this email.") +
+      "</div>" +
+      "</td></tr></table>" +
+      "</div>"
   );
 }
 
