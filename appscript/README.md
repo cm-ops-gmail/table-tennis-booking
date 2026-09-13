@@ -63,7 +63,7 @@ either.
   that fails to create is recorded the same way, in `Calendar Event ID`
   (e.g. `Failed: ...`) — that row is left alone on later runs rather than
   retried forever; clear the cell by hand to have it try again.
-- `GmailApp.sendEmail` quota depends on the Google account type (a Workspace
+- `MailApp.sendEmail` quota depends on the Google account type (a Workspace
   account has a much higher daily limit than a personal Gmail account) — if
   the tool sees heavy use, keep an eye on `Failed: ... quota` errors.
 - Emails always send from whichever Google account authorized/runs the

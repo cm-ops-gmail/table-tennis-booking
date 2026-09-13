@@ -172,7 +172,7 @@ function sendTestEmailToMyself() {
     Logger.log("Could not determine your email — run this from the Apps Script editor while signed in.");
     return;
   }
-  GmailApp.sendEmail(
+  MailApp.sendEmail(
     me,
     "Table Tennis mailer — test email",
     "If you can read this, the Table Tennis Apps Script mailer is wired up correctly and ready to send real booking emails.",
@@ -206,7 +206,7 @@ function sendPendingNotifications_() {
       continue;
     }
     try {
-      GmailApp.sendEmail(to, String(row["Subject"] || "Table Tennis Booking"), String(row["Body"] || ""), {
+      MailApp.sendEmail(to, String(row["Subject"] || "Table Tennis Booking"), String(row["Body"] || ""), {
         htmlBody: renderNotificationEmail_(row),
         name: TT_BRAND,
       });
@@ -262,7 +262,7 @@ function sendFeedbackReminders_() {
     for (let i = 0; i < emails.length; i++) {
       if (!emails[i]) continue;
       try {
-        GmailApp.sendEmail(
+        MailApp.sendEmail(
           emails[i],
           "How was your Table Tennis match? Feedback needed — " + row["Slot Label"],
           "Your match on " + date + " (" + row["Slot Label"] + ") has wrapped up — please submit your feedback: " + TT_APP_URL + "/rate",
