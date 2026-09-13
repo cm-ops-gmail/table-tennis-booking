@@ -71,6 +71,12 @@ const TT_TAB_BOOKINGS = "Bookings";
 const TT_TIMEZONE = "Asia/Dhaka";
 const TT_TRIGGER_FN = "runTableTennisMailer";
 const TT_BRAND = "10 Minute School — Table Tennis";
+// Every email is sent From this address instead of whichever Google account
+// authorized the script. Gmail only honors this if TT_FROM_EMAIL is a
+// verified "Send As" alias on that account (Gmail → Settings → Accounts and
+// Import → "Send mail as") — otherwise it silently falls back to sending as
+// the real account, no error. Set to "" to just send as that real account.
+const TT_FROM_EMAIL = "peopleops@10minuteschool.com";
 // The live site — used to build the "Submit feedback" / "View my bookings"
 // links in emails. Edit this one line if the domain ever changes.
 const TT_APP_URL = "https://tenms-table-tennis-booking.vercel.app";
@@ -148,15 +154,19 @@ function sendTestEmailToMyself() {
     Logger.log("Could not determine your email — run this from the Apps Script editor while signed in.");
     return;
   }
-  MailApp.sendEmail({
-    to: me,
-    subject: "Table Tennis mailer — test email",
-    htmlBody: emailShell_(
-      "Test email ✅",
-      '<p style="margin:0;font-size:14px;color:#333;line-height:1.6;">If you can read this, the Table Tennis Apps Script mailer is wired up correctly and ready to send real booking emails.</p>'
-    ),
-    name: TT_BRAND,
-  });
+  GmailApp.sendEmail(
+    me,
+    "Table Tennis mailer — test email",
+    "If you can read this, the Table Tennis Apps Script mailer is wired up correctly and ready to send real booking emails.",
+    {
+      htmlBody: emailShell_(
+        "Test email ✅",
+        '<p style="margin:0;font-size:14px;color:#333;line-height:1.6;">If you can read this, the Table Tennis Apps Script mailer is wired up correctly and ready to send real booking emails.</p>'
+      ),
+      name: TT_BRAND,
+      from: TT_FROM_EMAIL || undefined,
+    }
+  );
   Logger.log("Sent a test email to " + me);
 }
 
@@ -179,11 +189,10 @@ function sendPendingNotifications_() {
       continue;
     }
     try {
-      MailApp.sendEmail({
-        to,
-        subject: String(row["Subject"] || "Table Tennis Booking"),
+      GmailApp.sendEmail(to, String(row["Subject"] || "Table Tennis Booking"), String(row["Body"] || ""), {
         htmlBody: renderNotificationEmail_(row),
         name: TT_BRAND,
+        from: TT_FROM_EMAIL || undefined,
       });
       sheet.getRange(row.__row, statusCol).setValue("Sent");
       sent++;
@@ -237,12 +246,16 @@ function sendFeedbackReminders_() {
     for (let i = 0; i < emails.length; i++) {
       if (!emails[i]) continue;
       try {
-        MailApp.sendEmail({
-          to: emails[i],
-          subject: "How was your Table Tennis match? Feedback needed — " + row["Slot Label"],
-          htmlBody: renderFeedbackReminderEmail_(names[i] || "there", row, date),
-          name: TT_BRAND,
-        });
+        GmailApp.sendEmail(
+          emails[i],
+          "How was your Table Tennis match? Feedback needed — " + row["Slot Label"],
+          "Your match on " + date + " (" + row["Slot Label"] + ") has wrapped up — please submit your feedback: " + TT_APP_URL + "/rate",
+          {
+            htmlBody: renderFeedbackReminderEmail_(names[i] || "there", row, date),
+            name: TT_BRAND,
+            from: TT_FROM_EMAIL || undefined,
+          }
+        );
       } catch (err) {
         allOk = false;
       }

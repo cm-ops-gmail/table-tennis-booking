@@ -55,6 +55,12 @@ so this script watches the `Bookings` tab directly and marks each row's
 - A failed send gets `Status = "Failed: <reason>"` in the Notifications tab
   (or `Feedback Reminder Sent = "FAILED"` in Bookings) instead of silently
   disappearing, so problems are visible right in the sheet.
-- `MailApp.sendEmail` quota depends on the Google account type (a Workspace
+- `GmailApp.sendEmail` quota depends on the Google account type (a Workspace
   account has a much higher daily limit than a personal Gmail account) — if
   the tool sees heavy use, keep an eye on `Failed: ... quota` errors.
+- Emails send From `TT_FROM_EMAIL` (currently `peopleops@10minuteschool.com`)
+  instead of the account that authorized the script — but only if that
+  address is a verified "Send As" alias on that account (Gmail → Settings →
+  Accounts and Import → "Send mail as"). Without it, Gmail silently falls
+  back to sending as the real account; no error, it just won't change. Set
+  `TT_FROM_EMAIL = ""` to always send as the real account.
