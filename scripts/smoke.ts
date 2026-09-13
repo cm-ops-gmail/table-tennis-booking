@@ -362,12 +362,19 @@ async function main() {
     console.log("\ndate normalisation (sheet reformatted the Date column)");
     // A booking whose Date/times landed in the sheet in non-ISO formats
     // (what happens when the column is formatted as Date/Time and written
-    // with USER_ENTERED). The app must still see it as 2026-09-12.
+    // with USER_ENTERED). The app must still see it as a clean YYYY-MM-DD.
+    // Kept in the future (not a fixed calendar date, which would eventually
+    // drift into the past as real time moves on and start owing Eve/Dan
+    // feedback for the rest of the suite) — this test is only about format
+    // parsing, not past/future logic.
+    const weirdIso = futureDate(5);
+    const [wy, wm, wd] = weirdIso.split("-");
+    const weirdUsFormat = `${Number(wm)}/${Number(wd)}/${wy}`; // e.g. "9/18/2026"
     seedRow("Bookings", [
       {
         "Booking ID": "TTB-WEIRD-DATE",
         "Created At": new Date().toISOString(),
-        Date: "9/12/2026",
+        Date: weirdUsFormat,
         "Slot ID": 2,
         "Slot Label": "1:40 PM – 2:10 PM",
         "Start Time": "1:40 PM",
@@ -386,16 +393,16 @@ async function main() {
         Notes: "",
       },
     ]);
-    const weirdAvail = await call(`/availability?date=2026-09-12&viewerId=E5`);
+    const weirdAvail = await call(`/availability?date=${weirdIso}&viewerId=E5`);
     const weirdSlot = weirdAvail.body.slots.find((s: any) => s.id === 2);
     ok("a non-ISO Date cell still marks the slot booked", weirdSlot?.status === "booked", JSON.stringify(weirdSlot));
     const weirdDouble = await call("/bookings", {
-      body: { ownerId: "E3", participantIds: ["E1"], date: "2026-09-12", slotId: 2 },
+      body: { ownerId: "E3", participantIds: ["E1"], date: weirdIso, slotId: 2 },
     });
     ok("...and still blocks a double-booking of it (409)", weirdDouble.status === 409);
     const weirdMine = await call(`/bookings?employeeId=E5`);
     const weirdRow = (weirdMine.body.bookings || []).find((b: any) => b.bookingId === "TTB-WEIRD-DATE");
-    ok("...and reads back as a clean YYYY-MM-DD for the client", weirdRow?.date === "2026-09-12", JSON.stringify(weirdRow));
+    ok("...and reads back as a clean YYYY-MM-DD for the client", weirdRow?.date === weirdIso, JSON.stringify(weirdRow));
 
     console.log("\nadmin: blocked users");
     const blockUser = await call("/admin/blocks/user", {
