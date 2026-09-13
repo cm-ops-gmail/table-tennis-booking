@@ -77,10 +77,11 @@
  *     with the owner and every player — but not their line managers or
  *     HR — added as guests. That invite IS a player's confirmation; there's
  *     no separate email for it. A booking that's since been Cancelled has
- *     its event deleted again, which is what tells players it's off —
- *     Calendar sends its own cancellation notice to the guests. Feedback
- *     reminders never touch Calendar — those stay email-only. The
- *     "Calendar Event ID" column tracks which bookings already have one.
+ *     its description swapped to the matching "cancelled" wording and is
+ *     then deleted — Calendar's own cancellation notice to the guests
+ *     carries that updated text. Feedback reminders never touch Calendar
+ *     — those stay email-only. The "Calendar Event ID" column tracks which
+ *     bookings already have one.
  *
  * Nothing here runs on its own until you complete step 3 above.
  * ============================================================================
@@ -332,6 +333,24 @@ function ttConfirmedDescription_(row, date) {
   );
 }
 
+/** Same wording as the "booking cancelled" email participants used to get
+ *  (the app's old participantCancelled). Written into the event right
+ *  before it's deleted, so the cancellation notice Calendar sends the
+ *  guests carries this text rather than the leftover "officially booked"
+ *  description from when the event was created. */
+function ttCancelledDescription_(row, date) {
+  return (
+    "Hi team,\n\n" +
+    "Just a quick heads-up — your Table Tennis match has been cancelled. 🏓\n\n" +
+    "Booking Date: " + date + "\n" +
+    "Match Time: " + row["Slot Label"] + "\n" +
+    "All Players: " + ttPlayersLine_(row) + "\n" +
+    "Booking Owner: " + row["Owner Name"] + "\n" +
+    "Booking ID: " + row["Booking ID"] + "\n\n" +
+    "Catch you on the next game! 😎"
+  );
+}
+
 /**
  * Creates a Calendar event for every newly Confirmed booking (participants
  * as guests, so each gets an invite in their own calendar — line managers
@@ -385,7 +404,13 @@ function syncCalendarEvents_() {
     } else if (status === "Cancelled" && eventId && eventId.indexOf("Failed") !== 0) {
       try {
         const event = cal.getEventById(eventId);
-        if (event) event.deleteEvent();
+        if (event) {
+          // Swap in the cancellation wording before deleting, so the
+          // cancellation notice Calendar sends the guests carries this
+          // text instead of the original "officially booked" description.
+          event.setDescription(ttCancelledDescription_(row, ttNormDate_(row["Date"])));
+          event.deleteEvent();
+        }
       } catch (err) {
         // Already gone, or no longer accessible — nothing more to do here.
       }
