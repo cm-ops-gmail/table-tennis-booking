@@ -38,12 +38,19 @@
  *   2. Delete the default empty `Code.gs` content and paste this whole file
  *      in (or add it as a new script file — the function names just need to
  *      exist somewhere in the project).
- *   3. In the Apps Script editor, select `setupTableTennisMailer` from the
- *      function dropdown at the top and click ▶ Run. The first run will ask
- *      you to authorize the script (it needs to send email, read/write this
- *      spreadsheet, and manage Calendar events) — approve it. This installs
- *      both triggers above; you don't need to run anything manually again.
- *   4. Optional: run `sendTestEmailToMyself` once to confirm mail delivery
+ *   3. In the editor's left sidebar, click Services (+), find "Google
+ *      Calendar API" in the list, and click Add. This is required — the
+ *      Calendar sync below uses that Advanced Service (the `Calendar`
+ *      global) instead of the simpler built-in CalendarApp, specifically
+ *      so it can request an actual cancellation notification on delete
+ *      (CalendarApp's own deleteEvent() can't do that reliably). Without
+ *      this step, `Calendar` is undefined and every sync attempt fails.
+ *   4. Select `setupTableTennisMailer` from the function dropdown at the
+ *      top and click ▶ Run. The first run will ask you to authorize the
+ *      script (it needs to send email, read/write this spreadsheet, and
+ *      manage Calendar events) — approve it. This installs both triggers
+ *      above; you don't need to run anything manually again.
+ *   5. Optional: run `sendTestEmailToMyself` once to confirm mail delivery
  *      works before relying on it for real bookings.
  *
  * The live site URL used for the "Submit feedback" / "View my bookings"
@@ -56,17 +63,17 @@
  * override.
  *
  * WHAT IT DOES
- *   - Booking confirmed / cancelled → emails each participant's line
- *     manager (ONE email per manager even if they manage more than one
- *     player on the same booking — the app already groups these before
- *     writing the row) and HR. Players themselves only get an email for a
- *     CANCELLATION — a fresh booking's Calendar invite is their
- *     confirmation instead (see Calendar sync below), but a cancellation
- *     also gets an explicit email to every player, since Calendar's own
- *     cancellation notice isn't reliable enough to be the only notice they
- *     get (the organizer in particular never gets a self-notification).
- *     All of this is just "send whatever's Pending in the Notifications
- *     tab" — the app decides who gets what.
+ *   - Booking confirmed → emails each participant's line manager (ONE
+ *     email per manager even if they manage more than one player on the
+ *     same booking — the app already groups these before writing the row)
+ *     and HR. Players themselves get NO email for a confirmation — see
+ *     Calendar sync below for how they find out instead.
+ *   - Booking cancelled → the same line manager + HR emails as above,
+ *     PLUS an explicit "booking cancelled" email to every player this
+ *     time — on top of Calendar's own cancellation notice below, since a
+ *     missed cancellation notice is worse than a player getting two. All
+ *     of this is just "send whatever's Pending in the Notifications tab"
+ *     — the app decides who gets what.
  *   - Feedback reminder → sent directly by this script, not queued by the
  *     app, because it's driven by wall-clock time rather than a booking
  *     action: once a Confirmed booking's slot end time has passed and its
@@ -79,14 +86,18 @@
  *     (title, the slot's time, the same "officially booked" wording the
  *     app used to email participants, now in the invite's description)
  *     with the owner and every player — but not their line managers or
- *     HR — added as guests. That invite IS a player's confirmation; there's
- *     no separate email for it. A booking that's since been Cancelled has
- *     its description swapped to the matching "cancelled" wording and is
- *     then deleted — Calendar's own cancellation notice to the guests
- *     carries that updated text, on top of the explicit cancellation email
- *     every player also gets (see above). Feedback reminders never touch
- *     Calendar — those stay email-only. The "Calendar Event ID" column
- *     tracks which bookings already have one.
+ *     HR — added as attendees. That invite IS a player's confirmation;
+ *     there's no separate email for it. A booking that's since been
+ *     Cancelled has its description swapped to the matching "cancelled"
+ *     wording and is then deleted, both calls explicitly requesting
+ *     `sendUpdates: "all"` so Calendar actually emails the attendees a
+ *     cancellation notice carrying that updated text (see the note on
+ *     syncCalendarEvents_ for why this needs the Advanced Calendar
+ *     Service rather than the simpler CalendarApp) — on top of the
+ *     explicit cancellation email every player also gets (see above).
+ *     Feedback reminders never touch Calendar — those stay email-only.
+ *     The "Calendar Event ID" column tracks which bookings already have
+ *     one.
  *
  * Nothing here runs on its own until you complete step 3 above.
  * ============================================================================
@@ -295,8 +306,12 @@ function sendFeedbackReminders_() {
  * 3. Google Calendar — one event per booking, guests = the players
  * ------------------------------------------------------------------ */
 
-function ttCalendar_() {
-  return TT_CALENDAR_ID ? CalendarApp.getCalendarById(TT_CALENDAR_ID) : CalendarApp.getDefaultCalendar();
+/** "primary" = whichever Google account runs this script — same calendar
+ *  CalendarApp.getDefaultCalendar() would use, but as a plain ID string,
+ *  which is what the Advanced Calendar Service's Calendar.Events.* calls
+ *  below take instead of a Calendar object. */
+function ttCalendarId_() {
+  return TT_CALENDAR_ID || "primary";
 }
 
 /** "YYYY-MM-DD" + "HH:mm" (Asia/Dhaka, a fixed UTC+6 with no DST) → Date. */
@@ -358,13 +373,22 @@ function ttCancelledDescription_(row, date) {
 
 /**
  * Creates a Calendar event for every newly Confirmed booking (participants
- * as guests, so each gets an invite in their own calendar — line managers
- * and HR are NOT invited, they only get the email) and removes the event
- * again for any booking that's since been Cancelled. Feedback reminders
- * never touch Calendar at all — those stay email-only. The "Calendar Event
- * ID" column doubles as both the record of an event existing and the key
- * to find it again — blank means "not created yet" for a Confirmed
- * booking, or "already cleaned up" for a Cancelled one.
+ * as attendees, so each gets an invite in their own calendar — line
+ * managers and HR are NOT invited, they only get the email) and removes
+ * the event again for any booking that's since been Cancelled. Feedback
+ * reminders never touch Calendar at all — those stay email-only. The
+ * "Calendar Event ID" column doubles as both the record of an event
+ * existing and the key to find it again — blank means "not created yet"
+ * for a Confirmed booking, or "already cleaned up" for a Cancelled one.
+ *
+ * Uses the Advanced Calendar Service (the `Calendar` global — enable it
+ * via the Apps Script editor's Services (+) → "Google Calendar API" →
+ * Add, a one-time setup step) instead of the simpler built-in CalendarApp.
+ * CalendarApp's deleteEvent() has no way to request a notification and
+ * doesn't reliably send one — unlike deleting an event by hand in the
+ * Calendar web UI, which always explicitly asks Google to notify guests.
+ * The Advanced Service's sendUpdates: "all" is the documented way to
+ * guarantee that email actually goes out, on both creation and deletion.
  */
 function syncCalendarEvents_() {
   const { sheet, headers, rows } = readSheetObjects_(TT_TAB_BOOKINGS);
@@ -374,7 +398,7 @@ function syncCalendarEvents_() {
     Logger.log("Bookings tab is missing the 'Calendar Event ID' column — re-run the app's provisioning script.");
     return;
   }
-  const cal = ttCalendar_();
+  const calendarId = ttCalendarId_();
   let created = 0;
   let removed = 0;
 
@@ -391,31 +415,38 @@ function syncCalendarEvents_() {
         return e && e.indexOf("@") > -1;
       });
       try {
-        const event = cal.createEvent(
-          "🏓 Table Tennis — " + row["Slot Label"],
-          ttDateTime_(date, start),
-          ttDateTime_(date, end),
+        const event = Calendar.Events.insert(
           {
-            guests: emails.join(","),
-            sendInvites: true,
+            summary: "🏓 Table Tennis — " + row["Slot Label"],
             description: ttConfirmedDescription_(row, date),
-          }
+            start: { dateTime: ttDateTime_(date, start).toISOString(), timeZone: TT_TIMEZONE },
+            end: { dateTime: ttDateTime_(date, end).toISOString(), timeZone: TT_TIMEZONE },
+            attendees: emails.map(function (e) {
+              return { email: e };
+            }),
+          },
+          calendarId,
+          { sendUpdates: "all" }
         );
-        sheet.getRange(row.__row, evCol).setValue(event.getId());
+        sheet.getRange(row.__row, evCol).setValue(event.id);
         created++;
       } catch (err) {
         sheet.getRange(row.__row, evCol).setValue("Failed: " + err.message);
       }
     } else if (status === "Cancelled" && eventId && eventId.indexOf("Failed") !== 0) {
       try {
-        const event = cal.getEventById(eventId);
-        if (event) {
-          // Swap in the cancellation wording before deleting, so the
-          // cancellation notice Calendar sends the guests carries this
-          // text instead of the original "officially booked" description.
-          event.setDescription(ttCancelledDescription_(row, ttNormDate_(row["Date"])));
-          event.deleteEvent();
-        }
+        // Swap in the cancellation wording, then delete — sendUpdates:
+        // "all" on both calls is what actually guarantees Calendar emails
+        // the attendees, and the patch first means that email shows the
+        // cancellation text rather than the original "officially booked"
+        // description.
+        Calendar.Events.patch(
+          { description: ttCancelledDescription_(row, ttNormDate_(row["Date"])) },
+          calendarId,
+          eventId,
+          { sendUpdates: "all" }
+        );
+        Calendar.Events.remove(calendarId, eventId, { sendUpdates: "all" });
       } catch (err) {
         // Already gone, or no longer accessible — nothing more to do here.
       }
