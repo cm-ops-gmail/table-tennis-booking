@@ -31,7 +31,7 @@ const NAV = [
 ];
 
 const CREDITS = [
-  { icon: "🎨", role: "Designed by", name: "HR & Admin Team" },
+  { icon: "🎨", role: "Designed by", name: "People Operations Team" },
   { icon: "💻", role: "Developed by", name: "Fahad Bin Abdullah", sub: "Content Operations" },
   { icon: "🛠️", role: "Technical Support", name: "EPD Team" },
 ];
