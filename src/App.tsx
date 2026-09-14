@@ -352,7 +352,11 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   // primitive `sub` dep means this fires on login, not on every render).
   // If there's already a cached employee we don't block on it — the store
   // update just refreshes name / admin status live — but if the server now
-  // rejects us (removed from the roster, token dead) we sign out.
+  // fatally rejects us (removed from the roster, 10MS session actually
+  // dead) we sign out. A non-fatal failure (network blip, a cold-starting
+  // function, 10MS's own userinfo endpoint being briefly unreachable) just
+  // keeps the cached identity and tries again next time — treating those
+  // the same as a real rejection was logging people out at random.
   const userKey = user?.sub ?? null;
   useEffect(() => {
     if (loading || !userKey) return;
@@ -365,8 +369,10 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       else if (!hadCache) {
         setErrorMsg(r.error);
         setPhase("error");
-      } else {
+      } else if (r.fatal) {
         void signOut().then(() => refresh());
+      } else {
+        setPhase("idle");
       }
     });
     return () => {

@@ -1,6 +1,6 @@
 import { useSyncExternalStore } from "react";
 import type { Employee } from "../shared/types";
-import { api } from "./api";
+import { api, ApiError } from "./api";
 import { auth } from "./auth";
 
 const KEY = "tt_employee";
@@ -109,8 +109,17 @@ export async function signOut() {
  * /auth/sso (Bearer attached by api()), which matches the verified email
  * against the TT sheet and reports whether the person is an admin. Stores
  * the result; returns an error string if the account isn't on the roster.
+ *
+ * `fatal` distinguishes a genuine rejection (401 = the 10MS session itself
+ * is dead, 403 = that account isn't on the roster) from everything else —
+ * a network blip, a cold-starting serverless function, or 10MS's own
+ * userinfo endpoint being briefly unreachable, all of which the backend
+ * reports as a 502 (see api/_lib/auth.ts's emailFromToken). Only a fatal
+ * failure should ever sign someone out; a caller with a cached identity
+ * should just keep it and try again later for anything else, or a routine
+ * hiccup would look like getting logged out at random.
  */
-export async function resolveIdentity(): Promise<{ ok: true } | { ok: false; error: string }> {
+export async function resolveIdentity(): Promise<{ ok: true } | { ok: false; error: string; fatal: boolean }> {
   try {
     const { employee, isAdmin } = await api<{ employee: Employee; isAdmin: boolean }>("/auth/sso", {
       method: "POST",
@@ -120,7 +129,8 @@ export async function resolveIdentity(): Promise<{ ok: true } | { ok: false; err
     setIsAdmin(isAdmin);
     return { ok: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "Sign-in failed." };
+    const fatal = e instanceof ApiError && (e.status === 401 || e.status === 403);
+    return { ok: false, error: e instanceof Error ? e.message : "Sign-in failed.", fatal };
   }
 }
 
