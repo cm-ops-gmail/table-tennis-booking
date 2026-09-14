@@ -30,6 +30,16 @@ const NAV = [
   { to: "/rate", label: "Rate & feedback", emoji: "⭐" },
 ];
 
+/** Credits line shared by both the user and admin footers. */
+function SystemCredits() {
+  return (
+    <p className="mt-1 text-[11px] text-muted-foreground/70">
+      Designed by HR &amp; Admin Team · Developed by Fahad Bin Abdullah (Content Operations) · Technical Support by
+      EPD Team
+    </p>
+  );
+}
+
 function ThemeToggle() {
   const [, force] = useState(0);
   const dark = isDark();
@@ -247,6 +257,7 @@ function Shell({ children }: { children: React.ReactNode }) {
               </Link>
             </>
           )}
+          <SystemCredits />
         </footer>
       )}
       <Toaster />
@@ -281,6 +292,7 @@ function AdminShell({ children }: { children: React.ReactNode }) {
       <main className="tt-rise mx-auto max-w-6xl px-4 py-6">{children}</main>
       <footer className="mx-auto max-w-6xl px-4 pb-10 pt-4 text-center text-xs text-muted-foreground">
         🛠️ Admin view · you also have the regular user view via “← User view” above
+        <SystemCredits />
       </footer>
       <Toaster />
     </div>
