@@ -199,8 +199,13 @@ export async function createBooking(input: CreateBookingInput): Promise<Booking>
     throw new HttpError(400, "The same employee cannot be added twice.");
   }
   const people = await resolveIds(wantIds); // throws on unknown id
-  if (people.length < MIN_PLAYERS) throw new HttpError(400, `A booking needs at least ${MIN_PLAYERS} players.`);
-  if (people.length > MAX_PLAYERS) throw new HttpError(400, `A booking allows at most ${MAX_PLAYERS} players.`);
+  // A real match is singles (2) or doubles (4) — 3 isn't a valid line-up.
+  if (people.length !== MIN_PLAYERS && people.length !== MAX_PLAYERS) {
+    throw new HttpError(
+      400,
+      `A match needs exactly ${MIN_PLAYERS} players (singles) or ${MAX_PLAYERS} players (doubles).`
+    );
+  }
   for (const p of people) {
     if (!p.name || !p.employeeId) throw new HttpError(400, `Missing name or ID for ${p.email || "a participant"}.`);
   }

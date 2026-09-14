@@ -113,6 +113,11 @@ async function main() {
     });
     ok("max 4 players enforced", tooMany.status === 400);
 
+    const threePlayers = await call("/bookings", {
+      body: { ownerId: "E3", participantIds: ["E4", "E5"], date, slotId: 2 },
+    });
+    ok("3 players rejected — only singles (2) or doubles (4)", threePlayers.status === 400);
+
     const dup = await call("/bookings", {
       body: { ownerId: "E3", participantIds: ["E3"], date, slotId: 2 },
     });

@@ -226,7 +226,8 @@ export default function Book() {
   }
 
   const totalPlayers = participants.length + 1;
-  const playerValid = totalPlayers >= MIN_PLAYERS && totalPlayers <= MAX_PLAYERS;
+  // A real match is singles (2) or doubles (4) — 3 isn't a valid line-up.
+  const playerValid = totalPlayers === MIN_PLAYERS || totalPlayers === MAX_PLAYERS;
   const rel = cfg ? relativeLabel(date, cfg.today) : "";
 
   return (
@@ -506,7 +507,7 @@ export default function Book() {
 
           <Field
             label="Add teammates / opponents"
-            hint={`${MIN_PLAYERS}–${MAX_PLAYERS} players total. Anyone already booked that day can't be added.`}
+            hint={`Singles (${MIN_PLAYERS}) or doubles (${MAX_PLAYERS}) only — no 3-player matches. Anyone already booked that day can't be added.`}
           >
             <EmployeePicker
               all={employees}
@@ -539,7 +540,7 @@ export default function Book() {
             <p className="text-xs text-muted-foreground">
               {totalPlayers < MIN_PLAYERS
                 ? `Add at least ${MIN_PLAYERS - totalPlayers} more player.`
-                : `Remove ${totalPlayers - MAX_PLAYERS} player.`}
+                : `Table tennis needs ${MIN_PLAYERS} players (singles) or ${MAX_PLAYERS} players (doubles) — add 1 more, or remove 1.`}
             </p>
           )}
           {modalError && (
