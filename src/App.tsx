@@ -30,13 +30,27 @@ const NAV = [
   { to: "/rate", label: "Rate & feedback", emoji: "⭐" },
 ];
 
-/** Credits line shared by both the user and admin footers. */
+const CREDITS = [
+  { icon: "🎨", role: "Designed by", name: "HR & Admin Team" },
+  { icon: "💻", role: "Developed by", name: "Fahad Bin Abdullah", sub: "Content Operations" },
+  { icon: "🛠️", role: "Technical Support", name: "EPD Team" },
+];
+
+/** Credits strip shared by both the user and admin footers. */
 function SystemCredits() {
   return (
-    <p className="mt-1 text-[11px] text-muted-foreground/70">
-      Designed by HR &amp; Admin Team · Developed by Fahad Bin Abdullah (Content Operations) · Technical Support by
-      EPD Team
-    </p>
+    <div className="mx-auto mt-3 flex max-w-md flex-wrap items-start justify-center gap-x-8 gap-y-3 border-t border-border/60 pt-3">
+      {CREDITS.map((c) => (
+        <div key={c.role} className="flex flex-col items-center gap-0.5">
+          <span className="text-sm leading-none">{c.icon}</span>
+          <span className="text-[9.5px] font-semibold uppercase tracking-wider text-muted-foreground/55">
+            {c.role}
+          </span>
+          <span className="text-[11px] font-medium text-foreground/80">{c.name}</span>
+          {c.sub && <span className="text-[10px] text-muted-foreground/70">{c.sub}</span>}
+        </div>
+      ))}
+    </div>
   );
 }
 
