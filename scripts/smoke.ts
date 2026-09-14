@@ -160,10 +160,20 @@ async function main() {
     const { memReadTable } = await import("../api/_lib/memstore");
     const notif = memReadTable("Notifications");
     ok("notifications queued Pending", notif.rows.length > 0 && notif.rows.every((r) => r["Status"] === "Pending"));
+
+    const createdRows = notif.rows.filter((r) => r["Type"] === "booking_created");
+    const cancelledRows = notif.rows.filter((r) => r["Type"] === "booking_cancelled");
     ok(
-      "has line_manager + hr_admin rows, no participant email rows (they get a Calendar invite instead)",
-      new Set(notif.rows.map((r) => r["Recipient Role"])).size >= 2 &&
-        notif.rows.every((r) => r["Recipient Role"] !== "participant")
+      "booking_created has line_manager + hr_admin rows, no participant email (Calendar invite covers it)",
+      new Set(createdRows.map((r) => r["Recipient Role"])).size >= 2 &&
+        createdRows.every((r) => r["Recipient Role"] !== "participant")
+    );
+    ok(
+      "booking_cancelled emails every participant too (not just the Calendar cancellation notice), with proper body",
+      cancelledRows.some((r) => r["Recipient Role"] === "participant") &&
+        cancelledRows
+          .filter((r) => r["Recipient Role"] === "participant")
+          .every((r) => /has been cancelled/i.test(r["Body"]))
     );
 
     // E1 and E2 (this first booking's players) share the same line manager

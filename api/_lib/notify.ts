@@ -13,7 +13,7 @@ interface OutboxRow {
   "Notification ID": string;
   "Created At": string;
   Type: NotifType;
-  "Recipient Role": "line_manager" | "hr_admin";
+  "Recipient Role": "participant" | "line_manager" | "hr_admin";
   "Recipient Name": string;
   "Recipient Email": string;
   Subject: string;
@@ -24,6 +24,14 @@ interface OutboxRow {
 
 function fmtPlayers(b: Booking): string {
   return b.participants.map((p) => `${p.name} (${p.employeeId})${p.isOwner ? " — owner" : ""}`).join(", ");
+}
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+/** "2026-09-10" → "10 Sep" for the cancellation subject line. */
+function shortDate(ymd: string): string {
+  const m = ymd.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return ymd;
+  return `${Number(m[3])} ${MONTHS[Number(m[2]) - 1] || m[2]}`;
 }
 
 /** The shared "Date / Time / Players / Owner / ID" block. */
@@ -44,12 +52,26 @@ function detailsBlock(b: Booking, opts: { employeeLine?: string } = {}): string 
  * Per-recipient copy. Each returns { subject, body }. The Apps Script
  * wraps the body in the branded HTML shell (Subject becomes the heading).
  *
- * Players themselves get no email here — they're notified via the Google
- * Calendar invite the Apps Script creates for the booking (its description
- * carries the same "officially booked" wording), and via Calendar's own
- * cancellation notice when that event is later removed. Only line managers
- * and HR get an actual email, since they're never added to the invite.
+ * Players get no email for a fresh booking — the Google Calendar invite
+ * the Apps Script creates (its description carries this same "officially
+ * booked" wording) already serves as their confirmation. A cancellation is
+ * different: Calendar's own cancellation notice isn't reliable enough on
+ * its own to be the only notice a player gets (the organizer never gets a
+ * self-notification, for one), so cancelled bookings queue an explicit
+ * email to every participant here too, on top of the Calendar event being
+ * removed.
  * ------------------------------------------------------------------ */
+
+function participantCancelled(b: Booking, name: string) {
+  return {
+    subject: `🏓 Table Tennis Booking Cancelled — ${shortDate(b.date)}, ${b.slotLabel}`,
+    body:
+      `Hi ${name},\n\n` +
+      `Just a quick heads-up — your Table Tennis match has been cancelled. 🏓\n\n` +
+      `${detailsBlock(b)}\n\n` +
+      `Catch you on the next game! 😎`,
+  };
+}
 
 function managerConfirmed(b: Booking, managerName: string, employees: string, multi: boolean) {
   return {
@@ -105,9 +127,25 @@ export async function queueBookingNotifications(
     Status: "Pending" as const,
   };
 
-  // No email row for participants — they're notified via the Calendar
-  // invite (created/removed by the Apps Script) instead. See the comment
-  // above managerConfirmed().
+  // Participants: no email on a fresh booking (the Calendar invite covers
+  // it), but a cancellation gets an explicit email to every player, not
+  // just Calendar's own (unreliable) cancellation notice. See the comment
+  // above participantCancelled().
+  if (!created) {
+    for (const p of b.participants) {
+      if (!p.email) continue;
+      const { subject, body } = participantCancelled(b, p.name);
+      rows.push({
+        ...base,
+        "Notification ID": genId("NTF"),
+        "Recipient Role": "participant",
+        "Recipient Name": p.name,
+        "Recipient Email": p.email,
+        Subject: subject,
+        Body: body,
+      });
+    }
+  }
 
   // Line manager of each participant — grouped by manager email, so two
   // reports on the same booking get ONE email naming both. The roster only
