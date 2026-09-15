@@ -6,6 +6,7 @@ import type { Booking, BookingStatus, Participant } from "../../src/shared/types
 import { resolveIds, findById, listEmployees } from "./employees.js";
 import { listBlockedSlots, listBlockedDates, listBlockedUsers } from "./blocks.js";
 import { queueBookingNotifications } from "./notify.js";
+import { notifyTelegramBookingConfirmed, notifyTelegramBookingCancelled } from "./telegram.js";
 import { getConfig, getSlots } from "./config.js";
 
 function parseBooking(r: Record<string, string>): Booking {
@@ -305,6 +306,7 @@ export async function createBooking(input: CreateBookingInput): Promise<Booking>
   };
 
   await queueBookingNotifications(booking, "booking_created", people);
+  await notifyTelegramBookingConfirmed(booking);
 
   return booking;
 }
@@ -350,6 +352,7 @@ export async function cancelBooking(bookingId: string, requesterId: string): Pro
     };
   });
   await queueBookingNotifications(cancelled, "booking_cancelled", managers);
+  await notifyTelegramBookingCancelled(cancelled);
 
   return cancelled;
 }
